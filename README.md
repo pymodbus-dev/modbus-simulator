@@ -7,7 +7,7 @@ Modbus Simulator with GUI based on modbus-tk
 * [kivy 1.9.0 >](http://kivy.org/#download)
 
 ## Checking Out the Source
-    $ git clone https://github.com/dhoomakethu/modbus_simulator.git
+    $ git clone https://bitbucket.org/sanjaykv/modbus-simulator
     $ cd modbus_simulator
 
 ## Development Instructions
