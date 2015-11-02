@@ -47,6 +47,7 @@ A GUi should show up if all the requirements are met !!
 
 ## Packaging for different OS (Standalone applications)
 A standalone application specific to target OS can be created with Kivy package manager
+
 1. [OSX](http://kivy.org/docs/guide/packaging-macosx.html)
 2. [Linux](http://bitstream.io/packaging-and-distributing-a-kivy-application-on-linux.html)
 3. [Windows](http://kivy.org/docs/guide/packaging-windows.html)
