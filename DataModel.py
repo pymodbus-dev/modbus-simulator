@@ -226,7 +226,7 @@ class DataModel(GridLayout):
                 self.time_interval = time_interval
                 if self.is_simulating:
                     self.simulate_timer.cancel()
-                self.simulate_timer = BackgroundJob(self.time_interval,
+                self.simulate_timer = BackgroundJob("simulation", self.time_interval,
                                                      self._simulate_block_values)
                 self.dirty_thread = False
                 self.start_stop_simulation(self.simulate)
@@ -345,6 +345,7 @@ class DataModel(GridLayout):
         if self.simulate:
             if self.dirty_thread:
                 self.simulate_timer = BackgroundJob(
+                    "simulation",
                     self.time_interval,
                     self._simulate_block_values
                 )
