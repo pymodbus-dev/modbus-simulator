@@ -645,7 +645,7 @@ class ModbusSimuApp(App):
         config.set('Modbus', "block start", 0)
         config.set('Modbus', "block size", 100)
         config.set('Modbus', "bin min", 0)
-        config.set('Modbus', "bin max", 0)
+        config.set('Modbus', "bin max", 1)
         config.set('Modbus', "reg min", 0)
         config.set('Modbus', "reg max", 65535)
 
