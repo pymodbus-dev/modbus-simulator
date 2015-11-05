@@ -26,7 +26,7 @@ Modbus Simulator with GUI based on modbus-tk
     $ kivy main.py
 A GUi should show up if all the requirements are met !!
 
-![Screen Shot 2015-11-01 at 7.25.50 PM.png](https://bitbucket.org/repo/X9byrq/images/4179375251-Screen%20Shot%202015-11-01%20at%207.25.50%20PM.png)
+![main_screen.png](/img/main_screen.png)
 
 ## Usage instructions
 1. Select the interface (only TCP supported as of now)
@@ -43,7 +43,7 @@ A GUi should show up if all the requirements are met !!
     * to delete a datablock ,select an item and use 'delete' button in Datablock pane
 6. To simulate data , press 'Simulate' button
 7. All the settings for various modbus related settings (block size/minimum/maximun values/logging) could be set and accessed from settings panel (use F1 or click on Settings icon at the bottom)
-![Screen Shot 2015-11-01 at 8.20.07 PM.png](https://bitbucket.org/repo/X9byrq/images/2785617559-Screen%20Shot%202015-11-01%20at%208.20.07%20PM.png)
+![settings_screen.png](img/settings_screen.png)
 
 ## Packaging for different OS (Standalone applications)
 A standalone application specific to target OS can be created with Kivy package manager
