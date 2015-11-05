@@ -53,4 +53,4 @@ A standalone application specific to target OS can be created with Kivy package 
 3. [Windows](http://kivy.org/docs/guide/packaging-windows.html)
 
 ## OSx Standalone application
-[Modbus-Simulator v0.0.2](https://drive.google.com/open?id=0B8MS3muxUtROTHNMcW00QkNJdDQ)
+[Modbus-Simulator v0.0.3](/binaries/osx/modbus_simulator.app.zip)
