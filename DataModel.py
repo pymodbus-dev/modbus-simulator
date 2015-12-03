@@ -17,7 +17,7 @@ from kivy.logger import Logger
 from backgroundJob import BackgroundJob
 
 from random import randint
-Builder.load_file("DataModel.kv")
+Builder.load_file("datamodel.kv")
 
 integers_dict = {}
 
