@@ -11,6 +11,8 @@ from kivy.animation import Animation
 from kivy.uix.label import Label
 from kivy.uix.textinput import TextInput
 from kivy.uix.settings import (Settings, SettingsWithSidebar)
+from kivy.uix.listview import ListView, ListItemButton
+from kivy.adapters.listadapter import ListAdapter
 import DataModel
 from modbus import ModbusSimu, BLOCK_TYPES, configure_modbus_logger
 from settings import SettingIntegerWithRange
@@ -30,6 +32,7 @@ MAP = {
 class FloatInput(TextInput):
     pat2 = re.compile(r'\d+(?:,\d+)?')
     pat = re.compile('[^0-9]')
+
     def insert_text(self, substring, from_undo=False):
         pat = self.pat
         if '.' in self.text:
@@ -74,14 +77,15 @@ class Gui(BoxLayout):
     data_models = ObjectProperty()
 
     # Data models
+    data_count = ObjectProperty()
     data_model_coil = ObjectProperty()
     data_model_discrete_inputs = ObjectProperty()
     data_model_input_registers = ObjectProperty()
     data_model_holding_registers = ObjectProperty()
 
     # Helpers
-    slaves = ["%s" %i for i in xrange(1, 248)]
-    data_map = {}
+    # slaves = ["%s" %i for i in xrange(1, 248)]
+    _data_map = {"tcp": {}, "rtu": {}}
     active_slave = None
     server_running = False
     simulating = False
@@ -90,7 +94,9 @@ class Gui(BoxLayout):
     restart_simu = False
     sync_modbus_thread = None
     sync_modbus_time_interval = 5
-    modbus_device = None
+    _modbus_device = {"tcp": None, 'rtu': None}
+    _slaves = {"tcp": None, "rtu": None}
+
     last_active_port = {"tcp": "", "serial": ""}
     active_server = "tcp"
     _serial_settings_changed = False
@@ -131,6 +137,37 @@ class Gui(BoxLayout):
             self._sync_modbus_block_values
         )
         self.sync_modbus_thread.start()
+        self._slave_misc = {"tcp": [self.slave_start_add.text,
+                                    self.slave_end_add.text,
+                                    self.slave_count.text],
+                            "rtu": [self.slave_start_add.text,
+                                    self.slave_end_add.text,
+                                    self.slave_count.text]}
+
+    @property
+    def modbus_device(self):
+        return self._modbus_device[self.active_server]
+
+    @modbus_device.setter
+    def modbus_device(self, value):
+        self._modbus_device[self.active_server] = value
+
+    @property
+    def slave(self):
+        return self._slaves[self.active_server]
+
+    @slave.setter
+    def slave(self, value):
+        self._slaves[self.active_server] = value
+
+    @property
+    def data_map(self):
+        return self._data_map[self.active_server]
+
+    @data_map.setter
+    def data_map(self, value):
+        self._data_map[self.active_server] = value
+
 
     def _init_coils(self):
         time_interval = int(eval(self.config.get("Simulation",
@@ -225,29 +262,25 @@ class Gui(BoxLayout):
             else:
                 create_new = True
         if create_new:
+
             self.modbus_device = ModbusSimu(server=self.active_server,
                                             port=self.port.text,
                                             **kwargs
                                             )
+            if self.slave is None:
+
+                adapter = ListAdapter(
+                        data=[],
+                        cls=ListItemButton,
+                        selection_mode='single'
+                )
+                self.slave = ListView(adapter=adapter)
+
+            self._serial_settings_changed = False
 
     def start_server(self, btn):
         if btn.state == "down":
             self._create_modbus_device()
-            # if not self.modbus_device:
-            #     self.modbus_device = ModbusSimu(server=self.active_server,
-            #                                     port=self.port.text
-            #                                     )
-            # else:
-            #     if self.modbus_device.server_type == self.active_server:
-            #         if self.modbus_device.port != self.port.text:
-            #             self.modbus_device = ModbusSimu(
-            #                 server=self.active_server,
-            #                 port=self.port.text
-            #             )
-            #     else:
-            #         self.modbus_device = ModbusSimu(server=self.active_server,
-            #                                         port=self.port.text
-            #                                         )
 
             self.modbus_device.start()
             self.server_running = True
@@ -277,14 +310,10 @@ class Gui(BoxLayout):
         if value:
             self.interface_settings.current = checkbox
             self.port.text = self.last_active_port['tcp']
-            # tcp_label = Label(text="Port")
-            # tcp_input = TextInput(text="5440", multiline=False)
-            # self.interface_settings.add_widget(tcp_label)
-            # self.interface_settings.add_widget(tcp_input)
-            # self.modbus_device = ModbusSimu(port=int(tcp_input.text))
+            self._restore()
         else:
             self.last_active_port['tcp'] = self.port.text
-            # self.interface_settings.clear_widgets()
+            self._backup()
 
     def update_serial_connection_info(self, checkbox, value):
         self.active_server = "rtu"
@@ -293,9 +322,11 @@ class Gui(BoxLayout):
             if self.last_active_port['serial'] == "":
                 self.last_active_port['serial'] = '/dev/ptyp0'
             self.port.text = self.last_active_port['serial']
+            self._restore()
 
         else:
             self.last_active_port['serial'] = self.port.text
+            self._backup()
 
     def show_error(self, e):
         self.info_label.text = str(e)
@@ -342,7 +373,6 @@ class Gui(BoxLayout):
                     "dirty": False
                 }
             }
-
             self.modbus_device.add_slave(slave_to_add)
             for block_name, block_type in BLOCK_TYPES.items():
                 self.modbus_device.add_block(slave_to_add,
@@ -351,6 +381,7 @@ class Gui(BoxLayout):
             data.append(str(slave_to_add))
         self.slave_list.adapter.data = data
         self.slave_list._trigger_reset_populate()
+
         for item in selected:
             index = self.slave_list.adapter.data.index(item.text)
             if not self.slave_list.adapter.get_view(index).is_selected:
@@ -426,18 +457,20 @@ class Gui(BoxLayout):
         # self.data_map[self.active_slave][current_tab]['dirty'] = False
         _data = self.data_map[self.active_slave][current_tab]
         item_strings = _data['item_strings']
-        if len(item_strings) < self.block_size:
-            updated_data, item_strings = ct.content.add_data(1, item_strings)
-            _data['data'].update(updated_data)
-            _data['item_strings'] = item_strings
-            for k, v in updated_data.iteritems():
-                self.modbus_device.set_values(int(self.active_slave),
-                                              current_tab, k, v)
-        else:
-            msg = ("OutOfModbusBlockError: address %s"
-                   " is out of block size %s" %(len(item_strings),
-                                                self.block_size))
-            self.show_error(msg)
+        for i in xrange(int(self.data_count.text)):
+            if len(item_strings) < self.block_size:
+                updated_data, item_strings = ct.content.add_data(1, item_strings)
+                _data['data'].update(updated_data)
+                _data['item_strings'] = item_strings
+                for k, v in updated_data.iteritems():
+                    self.modbus_device.set_values(int(self.active_slave),
+                                                  current_tab, k, v)
+            else:
+                msg = ("OutOfModbusBlockError: address %s"
+                       " is out of block size %s" %(len(item_strings),
+                                                    self.block_size))
+                self.show_error(msg)
+                break
 
     def sync_data_callback(self, blockname, data):
         ct = self.data_models.current_tab
@@ -500,7 +533,8 @@ class Gui(BoxLayout):
     def update_backend(self, slave_id, blockname, new_data, ):
         self.modbus_device.remove_block(slave_id, blockname)
         self.modbus_device.add_block(slave_id, blockname,
-                                     BLOCK_TYPES[blockname], 0, 100)
+                                     BLOCK_TYPES[blockname], 0,
+                                     self.block_size)
         for k, v in new_data.iteritems():
             self.modbus_device.set_values(slave_id, blockname, k, int(v))
 
@@ -563,6 +597,29 @@ class Gui(BoxLayout):
                         value['data'].update(updated)
                         self.refresh()
 
+    def _backup(self):
+        if self.slave is not None:
+            self.slave.adapter.data = self.slave_list.adapter.data
+        self._slave_misc[self.active_server] = [
+            self.slave_start_add.text,
+            self.slave_end_add.text,
+            self.slave_count.text
+        ]
+
+    def _restore(self):
+        if self.slave is None:
+
+            adapter = ListAdapter(
+                    data=[],
+                    cls=ListItemButton,
+                    selection_mode='single'
+            )
+            self.slave = ListView(adapter=adapter)
+        self.slave_list.adapter.data = self.slave.adapter.data
+        (self.slave_start_add.text,
+         self.slave_end_add.text,
+         self.slave_count.text) = self._slave_misc[self.active_server]
+        self.slave_list._trigger_reset_populate()
 
 setting_panel = """
 [
