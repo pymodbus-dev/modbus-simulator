@@ -6,6 +6,7 @@ from modbus_tk.defines import (
 import logging
 from common import path, make_dir, remove_file
 import os
+import serial
 
 ADDRESS_RANGE = {
     COILS: 0,
@@ -16,7 +17,7 @@ ADDRESS_RANGE = {
 }
 import struct
 
-REGISTER_QUERY_FIELDS = {"bit": range(1, 17),
+REGISTER_QUERY_FIELDS = {"bit": range(0, 16),
                          "byteorder": ["big", "little"],
                          "formatter": ["default", "float1"],
                          "scaledivisor": 1,
@@ -41,11 +42,60 @@ BLOCK_TYPES = {"coils": COILS,
 MODBUS_TCP_PORT = 5440
 
 
-class ModBusSimu(object):
+class PseudoSerial(object):
+    def __init__(self, tty_name, **kwargs):
+        self.ser = serial.Serial()
+        self.ser.port = tty_name
+
+        self.serial_conf(**kwargs)
+
+    def serial_conf(self, **kwargs):
+        self.ser.baudrate = kwargs.get('baudrate', 9600)
+        self.ser.bytesize = kwargs.get('bytesize', serial.EIGHTBITS)
+        self.ser.parity = kwargs.get('parity', serial.PARITY_NONE)
+        self.ser.stopbits = kwargs.get('stopbits', serial.STOPBITS_ONE)
+        self.ser.timeout = kwargs.get('timeout', 2)  # Non-Block reading
+        self.ser.xonxoff = kwargs.get('xonxoff', False)  # Disable Software Flow Control
+        self.ser.rtscts = kwargs.get('rtscts', False)  # Disable (RTS/CTS) flow Control
+        self.ser.dsrdtr = kwargs.get('dsrdtr', False)  # Disable (DSR/DTR) flow Control
+        self.ser.writeTimeout = kwargs.get('writetimeout', 2)
+
+    def open(self):
+        self.ser.open()
+        self.ser.flushInput()
+        self.ser.flushOutput()
+
+    def close(self):
+        self.ser.close()
+
+    def get_serial_object(self):
+        return self.ser
+
+
+class ModbusSimu(object):
+    _server_add = ()
 
     def __init__(self, server="tcp", *args, **kwargs):
+        self._server_type = server
+        self._port = kwargs.get('port', None)
+        if server == 'rtu':
+            tty_name = kwargs['port']
+            kwargs.pop('port', None)
+            self._serial = PseudoSerial(tty_name, **kwargs)
+            kwargs = {k: v for k, v in kwargs.iteritems() if k == "serial"}
+            kwargs['serial'] = self._serial.ser
+        else:
+            kwargs['port'] = int(kwargs['port'])
         self.server = SERVERS.get(server, None)(*args, **kwargs)
         self.simulate = kwargs.get('simulate', False)
+
+    @property
+    def server_type(self):
+        return self._server_type
+
+    @property
+    def port(self):
+        return self._port
 
     def add_slave(self, slave_id):
         self.server.add_slave(slave_id)
@@ -78,77 +128,18 @@ class ModBusSimu(object):
 
     def start(self):
         self.server.start()
-        self.sa = self.server._sa
+        if self._server_type == "tcp":
+            self._server_add = self.server._sa
 
     def stop(self):
         self.server.stop()
+        if self._server_type == 'rtu':
+            self._serial.close()
+        self._server_add = ()
 
-
-class ModBusMaster(object):
-    def __init__(self, master="tcp", *args, **kwargs):
-        self.master = MASTERS.get(master, None)(*args, **kwargs)
-
-    def close(self):
-        self.master.close()
-
-    def get_value(self, ptype, slave_id, function_code, starting_address,
-                  quantity_of_x=1, output_value=0, data_format="",
-                  expected_length=-1, **kwargs):
-        # if ptype in ["BI", "BO"]:
-        #     return self._get_value(slave_id, function_code, starting_address,
-        #           quantity_of_x, output_value, data_format,
-        #           expected_length)
-        # else:
-        return self._get_formatted_value(ptype, slave_id,
-                                         function_code, starting_address,
-                                         quantity_of_x, **kwargs)
-
-    def _get_value(self, slave_id, function_code, starting_address,
-                   quantity_of_x=1, output_value=0, data_format="",
-                   expected_length=-1):
-        starting_address -= ADDRESS_RANGE[function_code]
-        return self.master.execute(slave_id, function_code, starting_address,
-                                   quantity_of_x, output_value, data_format,
-                                   expected_length)
-
-    def _get_formatted_value(self, ptype, slave_id, function_code,
-                             starting_address,
-                             quantity_of_x, **kwargs):
-        # pre process
-        # The register data in the response message are packed as two bytes
-        # per register, with the binary contents right justified within
-        # each byte. For each register, the first byte contains the high
-        # order bits and the second contains the low order bits.
-        wordcount = kwargs.get("wordcount", 1)
-        quantity_of_x *= wordcount
-
-        raw_val = self._get_value(slave_id, function_code,
-                                  starting_address, quantity_of_x)
-        formatter = kwargs.get("formatter", "default")
-
-        # post process
-        if ptype not in ["BI", "BO"]:
-            byteorder = kwargs.get("byteorder", "big")
-            wordorder = kwargs.get("wordorder", "big")
-            if byteorder != "big":
-                raw_val = swap_bytes(raw_val)
-            if wordcount > 1:
-                raw_val = process_words(raw_val)
-            if wordorder != "big":
-                raw_val = change_word_endianness(raw_val)
-            if formatter == "float1":
-                raw_val = pack_float(raw_val)
-            scalemultiplier = kwargs.get("scalemultiplier", 1)
-
-            scaledivisor = kwargs.get("scaledivisor", 1.0)
-            scaledivisor = float(scaledivisor)
-
-            bit = kwargs.get("bit", "")
-            if bit != "":
-                raw_val = get_bit(raw_val[0], bit)
-            raw_val = [v*scalemultiplier for v in raw_val]
-            raw_val = [v/scaledivisor for v in raw_val]
-        return raw_val
+    def get_slaves(self):
+        if self.server is not None:
+            return self.server._databank._slaves
 
 
 def swap_bytes(byte_array):
