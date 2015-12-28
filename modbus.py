@@ -6,6 +6,7 @@ from modbus_tk.defines import (
 import logging
 from common import path, make_dir, remove_file
 import os
+import serial
 
 ADDRESS_RANGE = {
     COILS: 0,
@@ -16,7 +17,7 @@ ADDRESS_RANGE = {
 }
 import struct
 
-REGISTER_QUERY_FIELDS = {"bit": range(1, 17),
+REGISTER_QUERY_FIELDS = {"bit": range(0, 16),
                          "byteorder": ["big", "little"],
                          "formatter": ["default", "float1"],
                          "scaledivisor": 1,
@@ -41,11 +42,60 @@ BLOCK_TYPES = {"coils": COILS,
 MODBUS_TCP_PORT = 5440
 
 
-class ModBusSimu(object):
+class PseudoSerial(object):
+    def __init__(self, tty_name, **kwargs):
+        self.ser = serial.Serial()
+        self.ser.port = tty_name
+
+        self.serial_conf(**kwargs)
+
+    def serial_conf(self, **kwargs):
+        self.ser.baudrate = kwargs.get('baudrate', 9600)
+        self.ser.bytesize = kwargs.get('bytesize', serial.EIGHTBITS)
+        self.ser.parity = kwargs.get('parity', serial.PARITY_NONE)
+        self.ser.stopbits = kwargs.get('stopbits', serial.STOPBITS_ONE)
+        self.ser.timeout = kwargs.get('timeout', 2)  # Non-Block reading
+        self.ser.xonxoff = kwargs.get('xonxoff', False)  # Disable Software Flow Control
+        self.ser.rtscts = kwargs.get('rtscts', False)  # Disable (RTS/CTS) flow Control
+        self.ser.dsrdtr = kwargs.get('dsrdtr', False)  # Disable (DSR/DTR) flow Control
+        self.ser.writeTimeout = kwargs.get('writetimeout', 2)
+
+    def open(self):
+        self.ser.open()
+        self.ser.flushInput()
+        self.ser.flushOutput()
+
+    def close(self):
+        self.ser.close()
+
+    def get_serial_object(self):
+        return self.ser
+
+
+class ModbusSimu(object):
+    _server_add = ()
 
     def __init__(self, server="tcp", *args, **kwargs):
+        self._server_type = server
+        self._port = kwargs.get('port', None)
+        if server == 'rtu':
+            tty_name = kwargs['port']
+            kwargs.pop('port', None)
+            self._serial = PseudoSerial(tty_name, **kwargs)
+            kwargs = {k: v for k, v in kwargs.iteritems() if k == "serial"}
+            kwargs['serial'] = self._serial.ser
+        else:
+            kwargs['port'] = int(kwargs['port'])
         self.server = SERVERS.get(server, None)(*args, **kwargs)
         self.simulate = kwargs.get('simulate', False)
+
+    @property
+    def server_type(self):
+        return self._server_type
+
+    @property
+    def port(self):
+        return self._port
 
     def add_slave(self, slave_id):
         self.server.add_slave(slave_id)
@@ -78,18 +128,38 @@ class ModBusSimu(object):
 
     def start(self):
         self.server.start()
-        self.sa = self.server._sa
+        if self._server_type == "tcp":
+            self._server_add = self.server._sa
 
     def stop(self):
         self.server.stop()
+        if self._server_type == 'rtu':
+            self._serial.close()
+        self._server_add = ()
 
 
-class ModBusMaster(object):
+class ModbusMaster(object):
+    # to fix:
+    # ModbusRTU Master is having issues while getting data from slave when run
+    # from with in test cases .
     def __init__(self, master="tcp", *args, **kwargs):
+        self._master = master
+        if master == 'rtu':
+            self._serial = PseudoSerial(kwargs['port'])
+            kwargs.pop('port', None)
+            kwargs['serial'] = self._serial.ser
+            self.master = None
+        # else:
         self.master = MASTERS.get(master, None)(*args, **kwargs)
+        self.master.set_timeout(5)
+        self._is_opened = False
 
     def close(self):
         self.master.close()
+        if self._master == 'rtu':
+            self._serial.close()
+        self._is_opened = self.master._is_opened
+        self.master = None
 
     def get_value(self, ptype, slave_id, function_code, starting_address,
                   quantity_of_x=1, output_value=0, data_format="",
@@ -108,8 +178,10 @@ class ModBusMaster(object):
                    expected_length=-1):
         starting_address -= ADDRESS_RANGE[function_code]
         return self.master.execute(slave_id, function_code, starting_address,
-                                   quantity_of_x, output_value, data_format,
-                                   expected_length)
+                                   quantity_of_x,
+                                   output_value, data_format,
+                                   expected_length
+                                   )
 
     def _get_formatted_value(self, ptype, slave_id, function_code,
                              starting_address,

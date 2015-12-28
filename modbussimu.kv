@@ -64,11 +64,11 @@
             id: interface_settings
             orientation: 'vertical' if self.width < self.height else 'horizontal'
             size_hint: None, 1
-            width: '150sp'
+            width: '200sp'
             padding: '2sp'
             Label:
                 text: "Port"
-            FloatInput:
+            TextInput:
                 id: txtBox
                 text: "5440"
                 multiline: False

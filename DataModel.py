@@ -17,7 +17,7 @@ from kivy.logger import Logger
 from backgroundJob import BackgroundJob
 
 from random import randint
-Builder.load_file("DataModel.kv")
+Builder.load_file("datamodel.kv")
 
 integers_dict = {}
 
@@ -27,7 +27,7 @@ class ErrorPopup(Popup):
     Popup class to display error messages
     """
     def __init__(self, **kwargs):
-        print kwargs
+        # print kwargs
         super(ErrorPopup, self).__init__(**kwargs) 
         content = BoxLayout(orientation="vertical") 
         content.add_widget(Label(text=kwargs['text'], font_size=20)) 
@@ -89,7 +89,8 @@ class NumericTextInput(SelectableView, TextInput):
         self.bold = True
         if isinstance(self.parent, CompositeListItem):
             for child in self.parent.children:
-                print child.children
+                # print child.children
+                pass
             self.parent.select_from_child(self, *args)
 
     def deselect(self, *args):
@@ -363,7 +364,7 @@ class DataModel(GridLayout):
             if data:
                 for index, value in data.items():
                     data[index] = randint(self.minval, self.maxval)
-                    print self.minval, self.maxval, data[index]
+                    # print self.minval, self.maxval, data[index]
                 self.refresh(data)
                 self.dispatcher.dispatch('on_update',
                                          self._parent,

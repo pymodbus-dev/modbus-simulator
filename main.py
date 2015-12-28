@@ -12,11 +12,12 @@ from kivy.uix.label import Label
 from kivy.uix.textinput import TextInput
 from kivy.uix.settings import (Settings, SettingsWithSidebar)
 import DataModel
-from modbus import ModBusSimu, BLOCK_TYPES, configure_modbus_logger
+from modbus import ModbusSimu, BLOCK_TYPES, configure_modbus_logger
 from settings import SettingIntegerWithRange
 from backgroundJob import BackgroundJob
 import re
 import os
+from kivy.config import Config
 
 MAP = {
     "coils": "coils",
@@ -89,16 +90,56 @@ class Gui(BoxLayout):
     restart_simu = False
     sync_modbus_thread = None
     sync_modbus_time_interval = 5
+    modbus_device = None
+    last_active_port = {"tcp": "", "serial": ""}
+    active_server = "tcp"
+    _serial_settings_changed = False
 
-    def __init__(self, cfg, **kwargs):
+    def __init__(self, **kwargs):
         super(Gui, self).__init__(**kwargs)
         time_interval = kwargs.get("time_interval", 1)
-
+        self.config = Config.get_configparser('app')
         self.slave_list.adapter.bind(on_selection_change=self.select_slave)
         self.data_model_loc.disabled = True
         self.slave_pane.disabled = True
-        minval = kwargs.get("bin_min_val", 0)
-        maxval = kwargs.get("bin_max_val", 1)
+        self._init_coils()
+        self._init_registers()
+        self._register_config_change_callback(
+            self._update_serial_connection,
+            'Modbus Serial'
+        )
+        self.data_model_loc.disabled = True
+        cfg = {
+            'no_modbus_log': not bool(eval(
+                self.config.get("Logging", "logging"))),
+            'no_modbus_console_log': not bool(
+                eval(self.config.get("Logging", "console logging"))),
+            'modbus_console_log_level': self.config.get("Logging",
+                                                        "console log level"),
+            'modbus_file_log_level': self.config.get("Logging",
+                                                     "file log level"),
+            'no_modbus_file_log': not bool(eval(
+                self.config.get("Logging", "file logging"))),
+
+            'modbus_log': kwargs['modbus_log']
+        }
+        configure_modbus_logger(cfg)
+        self.simu_time_interval = time_interval
+        self.sync_modbus_thread = BackgroundJob(
+            "modbus_sync",
+            self.sync_modbus_time_interval,
+            self._sync_modbus_block_values
+        )
+        self.sync_modbus_thread.start()
+
+    def _init_coils(self):
+        time_interval = int(eval(self.config.get("Simulation",
+                                                 "time interval")))
+        minval = int(eval(self.config.get("Modbus Protocol",
+                                          "bin min")))
+        maxval = int(eval(self.config.get("Modbus Protocol",
+                                          "bin max")))
+
         self.data_model_coil.init(
             blockname="coils",
             simulate=self.simulating,
@@ -115,10 +156,18 @@ class Gui(BoxLayout):
             maxval=maxval,
             _parent=self
         )
-        minval = kwargs.get("reg_min_val", 0)
-        maxval = kwargs.get("reg_max_val", 65535)
-        self.block_start = kwargs.get("block_start", 0)
-        self.block_size = kwargs.get("block_size", 100)
+
+    def _init_registers(self):
+        time_interval = int(eval(self.config.get("Simulation",
+                                                 "time interval")))
+        minval = int(eval(self.config.get("Modbus Protocol",
+                                          "reg min")))
+        maxval = int(eval(self.config.get("Modbus Protocol",
+                                          "reg max")))
+        self.block_start = int(eval(self.config.get("Modbus Protocol",
+                                                    "block start")))
+        self.block_size = int(eval(self.config.get("Modbus Protocol",
+                                                   "block size")))
         self.data_model_input_registers.init(
             blockname="input_registers",
             simulate=self.simulating,
@@ -135,19 +184,71 @@ class Gui(BoxLayout):
             maxval=maxval,
             _parent=self
         )
-        self.data_model_loc.disabled = True
-        configure_modbus_logger(cfg)
-        self.modbus_device = ModBusSimu(port=int(self.port.text))
-        self.simu_time_interval = time_interval
-        self.sync_modbus_thread = BackgroundJob(
-            "modbus_sync",
-            self.sync_modbus_time_interval,
-            self._sync_modbus_block_values
-        )
-        self.sync_modbus_thread.start()
 
-    def start_server(self, btn):       
+    def _register_config_change_callback(self, callback, section, key=None):
+        self.config.add_callback(callback, section, key)
+
+    def _update_serial_connection(self, *args):
+        self._serial_settings_changed = True
+
+    def _create_modbus_device(self):
+        kwargs = {}
+        create_new = False
+        if self.active_server == "rtu":
+
+            kwargs["baudrate"] = int(eval(
+                self.config.get('Modbus Serial', "baudrate")))
+            kwargs["bytesize"] = int(eval(
+                self.config.get('Modbus Serial', "bytesize")))
+            kwargs["parity"] = self.config.get('Modbus Serial', "parity")
+            kwargs["stopbits"] = int(eval(
+                self.config.get('Modbus Serial', "stopbits")))
+            kwargs["xonxoff"] = bool(eval(
+                self.config.get('Modbus Serial', "xonxoff")))
+            kwargs["rtscts"] = bool(eval(
+                self.config.get('Modbus Serial', "rtscts")))
+            kwargs["dsrdtr"] = bool(eval(
+                self.config.get('Modbus Serial', "dsrdtr")))
+            kwargs["writetimeout"] = int(eval(
+                self.config.get('Modbus Serial', "writetimeout")))
+            kwargs["timeout"] = bool(eval(
+                self.config.get('Modbus Serial', "timeout")))
+
+        if not self.modbus_device:
+            create_new = True
+        else:
+            if self.modbus_device.server_type == self.active_server:
+                if self.modbus_device.port != self.port.text:
+                    create_new = True
+                if self._serial_settings_changed:
+                    create_new = True
+            else:
+                create_new = True
+        if create_new:
+            self.modbus_device = ModbusSimu(server=self.active_server,
+                                            port=self.port.text,
+                                            **kwargs
+                                            )
+
+    def start_server(self, btn):
         if btn.state == "down":
+            self._create_modbus_device()
+            # if not self.modbus_device:
+            #     self.modbus_device = ModbusSimu(server=self.active_server,
+            #                                     port=self.port.text
+            #                                     )
+            # else:
+            #     if self.modbus_device.server_type == self.active_server:
+            #         if self.modbus_device.port != self.port.text:
+            #             self.modbus_device = ModbusSimu(
+            #                 server=self.active_server,
+            #                 port=self.port.text
+            #             )
+            #     else:
+            #         self.modbus_device = ModbusSimu(server=self.active_server,
+            #                                         port=self.port.text
+            #                                         )
+
             self.modbus_device.start()
             self.server_running = True
             self.interface_settings.disabled = True
@@ -172,22 +273,29 @@ class Gui(BoxLayout):
             btn.text = "Start"
 
     def update_tcp_connection_info(self, checkbox, value):
+        self.active_server = "tcp"
         if value:
             self.interface_settings.current = checkbox
-            tcp_label = Label(text="Port")
-            tcp_input = TextInput(text="5440", multiline=False)
-            self.interface_settings.add_widget(tcp_label)
-            self.interface_settings.add_widget(tcp_input)
+            self.port.text = self.last_active_port['tcp']
+            # tcp_label = Label(text="Port")
+            # tcp_input = TextInput(text="5440", multiline=False)
+            # self.interface_settings.add_widget(tcp_label)
+            # self.interface_settings.add_widget(tcp_input)
+            # self.modbus_device = ModbusSimu(port=int(tcp_input.text))
         else:
-            self.interface_settings.clear_widgets()
+            self.last_active_port['tcp'] = self.port.text
+            # self.interface_settings.clear_widgets()
 
     def update_serial_connection_info(self, checkbox, value):
+        self.active_server = "rtu"
         if value:
             self.interface_settings.current = checkbox
-            serial_label = Label(text="Serial Settings not supported !!")
-            self.interface_settings.add_widget(serial_label)
+            if self.last_active_port['serial'] == "":
+                self.last_active_port['serial'] = '/dev/ptyp0'
+            self.port.text = self.last_active_port['serial']
+
         else:
-            self.interface_settings.clear_widgets()
+            self.last_active_port['serial'] = self.port.text
 
     def show_error(self, e):
         self.info_label.text = str(e)
@@ -460,30 +568,109 @@ setting_panel = """
 [
   {
     "type": "title",
-    "title": "Modbus Settings"
+    "title": "Modbus TCP Settings"
   },
   {
     "type": "string",
     "title": "IP",
     "desc": "Modbus Server IP address",
-    "section": "Modbus", "key": "IP"
+    "section": "Modbus Tcp",
+    "key": "IP"
+  },
+  {
+    "type": "title",
+    "title": "Modbus Serial Settings"
+  },
+  {
+    "type": "numeric",
+    "title": "baudrate",
+    "desc": "Modbus Serial baudrate",
+    "section": "Modbus Serial",
+    "key": "baudrate"
+  },
+  {
+    "type": "options",
+    "title": "bytesize",
+    "desc": "Modbus Serial bytesize",
+    "section": "Modbus Serial",
+    "key": "bytesize",
+    "options": ["5", "6", "7", "8"]
+
+  },
+  {
+    "type": "options",
+    "title": "parity",
+    "desc": "Modbus Serial parity",
+    "section": "Modbus Serial",
+    "key": "parity",
+    "options": ["N", "E", "O", "M", "S"]
+  },
+  {
+    "type": "options",
+    "title": "stopbits",
+    "desc": "Modbus Serial stopbits",
+    "section": "Modbus Serial",
+    "key": "stopbits",
+    "options": ["1", "1.5", "2"]
+
+  },
+  {
+    "type": "bool",
+    "title": "xonxoff",
+    "desc": "Modbus Serial xonxoff",
+    "section": "Modbus Serial",
+    "key": "xonxoff"
+  },
+  {
+    "type": "bool",
+    "title": "rtscts",
+    "desc": "Modbus Serial rtscts",
+    "section": "Modbus Serial",
+    "key": "rtscts"
+  },
+  {
+    "type": "bool",
+    "title": "dsrdtr",
+    "desc": "Modbus Serial dsrdtr",
+    "section": "Modbus Serial",
+    "key": "dsrdtr"
+  },
+  {
+    "type": "numeric",
+    "title": "timeout",
+    "desc": "Modbus Serial timeout",
+    "section": "Modbus Serial",
+    "key": "timeout"
+  },
+  {
+    "type": "numeric",
+    "title": "write timeout",
+    "desc": "Modbus Serial write timeout",
+    "section": "Modbus Serial",
+    "key": "writetimeout"
+  },
+  {
+    "type": "title",
+    "title": "Modbus Protocol Settings"
   },
   {
     "type": "numeric",
     "title": "Block Start",
     "desc": "Modbus Block Start index",
-    "section": "Modbus", "key": "Block Start"
+    "section": "Modbus Protocol",
+    "key": "Block Start"
   },
   { "type": "numeric",
     "title": "Block Size",
     "desc": "Modbus Block Size for various registers/coils/inputs",
-    "section": "Modbus", "key": "Block Size"
+    "section": "Modbus Protocol",
+    "key": "Block Size"
   },
   {
     "type": "numeric_range",
     "title": "Coil/Discrete Input MinValue",
     "desc": "Minimum value a coil/discrete input can hold (0).An invalid value will be discarded unless Override flag is set",
-    "section": "Modbus",
+    "section": "Modbus Protocol",
     "key": "bin min",
     "range": [0,0]
   },
@@ -491,7 +678,7 @@ setting_panel = """
     "type": "numeric_range",
     "title": "Coil/Discrete Input MaxValue",
     "desc": "Maximum value a coil/discrete input can hold (1). An invalid value will be discarded unless Override flag is set",
-    "section": "Modbus",
+    "section": "Modbus Protocol",
     "key": "bin max",
     "range": [1,1]
 
@@ -500,7 +687,7 @@ setting_panel = """
     "type": "numeric_range",
     "title": "Holding/Input register MinValue",
     "desc": "Minimum value a registers can hold (0).An invalid value will be discarded unless Override flag is set",
-    "section": "Modbus",
+    "section": "Modbus Protocol",
     "key": "reg min",
     "range": [0,65535]
   },
@@ -508,7 +695,7 @@ setting_panel = """
     "type": "numeric_range",
     "title": "Holding/Input register MaxValue",
     "desc": "Maximum value a register input can hold (65535). An invalid value will be discarded unless Override flag is set",
-    "section": "Modbus",
+    "section": "Modbus Protocol",
     "key": "reg max",
     "range": [0,65535]
   },
@@ -585,43 +772,9 @@ class ModbusSimuApp(App):
     settings_cls = SettingsWithSidebar
 
     def build(self):
-        cfg = {
-            'no_modbus_log': not bool(eval(
-                self.config.get("Logging", "logging"))),
-            'no_modbus_console_log': not bool(
-                eval(self.config.get("Logging", "console logging"))),
-            'modbus_console_log_level': self.config.get("Logging",
-                                                        "console log level"),
-            'modbus_file_log_level': self.config.get("Logging",
-                                                        "file log level"),
-            'no_modbus_file_log': not bool(eval(
-                self.config.get("Logging", "file logging"))),
 
-            'modbus_log': os.path.join(self.user_data_dir, 'modbus.log')
-        }
-        time_interval = int(eval(self.config.get("Simulation",
-                                                  "time interval")))
-        bin_min_val = int(eval(self.config.get("Modbus",
-                                                  "bin min")))
-        bin_max_val = int(eval(self.config.get("Modbus",
-                                                  "bin max")))
-        reg_min_val = int(eval(self.config.get("Modbus",
-                                                  "reg min")))
-        reg_max_val = int(eval(self.config.get("Modbus",
-                                                  "reg max")))
-        block_start = int(eval(self.config.get("Modbus",
-                                               "block start")))
-        block_size = int(eval(self.config.get("Modbus",
-                                              "block size")))
         self.gui = Gui(
-            cfg,
-            time_interval=time_interval,
-            bin_min_val=bin_min_val,
-            bin_max_val=bin_max_val,
-            reg_min_val=reg_min_val,
-            reg_max_val=reg_max_val,
-            block_start=block_start,
-            block_size=block_size
+            modbus_log=os.path.join(self.user_data_dir, 'modbus.log')
         )
         return self.gui
 
@@ -640,14 +793,25 @@ class ModbusSimuApp(App):
         self.open_settings()
 
     def build_config(self, config):
-        config.add_section('Modbus')
-        config.set('Modbus', "ip", '127.0.0.1')
-        config.set('Modbus', "block start", 0)
-        config.set('Modbus', "block size", 100)
-        config.set('Modbus', "bin min", 0)
-        config.set('Modbus', "bin max", 1)
-        config.set('Modbus', "reg min", 0)
-        config.set('Modbus', "reg max", 65535)
+        config.add_section('Modbus Tcp')
+        config.add_section('Modbus Protocol')
+        config.add_section('Modbus Serial')
+        config.set('Modbus Tcp', "ip", '127.0.0.1')
+        config.set('Modbus Protocol', "block start", 0)
+        config.set('Modbus Protocol', "block size", 100)
+        config.set('Modbus Protocol', "bin min", 0)
+        config.set('Modbus Protocol', "bin max", 1)
+        config.set('Modbus Protocol', "reg min", 0)
+        config.set('Modbus Protocol', "reg max", 65535)
+        config.set('Modbus Serial', "baudrate", 9600)
+        config.set('Modbus Serial', "bytesize", "8")
+        config.set('Modbus Serial', "parity", 'N')
+        config.set('Modbus Serial', "stopbits", "1")
+        config.set('Modbus Serial', "xonxoff", 0)
+        config.set('Modbus Serial', "rtscts", 0)
+        config.set('Modbus Serial', "dsrdtr", 0)
+        config.set('Modbus Serial', "writetimeout", 2)
+        config.set('Modbus Serial', "timeout", 2)
 
         config.add_section('Logging')
         config.set('Logging', "log file",  os.path.join(self.user_data_dir,
@@ -674,13 +838,13 @@ class ModbusSimuApp(App):
         token = section, key
         if token == ("Simulation", "time interval"):
             self.gui.change_simulation_settings(time_interval=eval(value))
-        if section == "Modbus" and key in ("bin max",
+        if section == "Modbus Protocol" and key in ("bin max",
                                            "bin min", "reg max",
                                            "reg min", "override"):
             self.gui.change_datamodel_settings(key, value)
-        if section == "Modbus" and key == "block start":
+        if section == "Modbus Protocol" and key == "block start":
             self.gui.block_start = int(value)
-        if section == "Modbus" and key == "block size":
+        if section == "Modbus Protocol" and key == "block size":
             self.gui.block_size = int(value)
 
     def close_settings(self, *args):
