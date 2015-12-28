@@ -32,6 +32,7 @@ MAP = {
 class FloatInput(TextInput):
     pat2 = re.compile(r'\d+(?:,\d+)?')
     pat = re.compile('[^0-9]')
+
     def insert_text(self, substring, from_undo=False):
         pat = self.pat
         if '.' in self.text:
@@ -597,8 +598,6 @@ class Gui(BoxLayout):
                         self.refresh()
 
     def _backup(self):
-        print "backing up %s" % self.active_server
-        print self.slave
         if self.slave is not None:
             self.slave.adapter.data = self.slave_list.adapter.data
         self._slave_misc[self.active_server] = [
@@ -608,8 +607,6 @@ class Gui(BoxLayout):
         ]
 
     def _restore(self):
-        print "restoring %s" % self.active_server
-        print self.slave
         if self.slave is None:
 
             adapter = ListAdapter(
