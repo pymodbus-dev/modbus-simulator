@@ -137,6 +137,10 @@ class ModbusSimu(object):
             self._serial.close()
         self._server_add = ()
 
+    def get_slaves(self):
+        if self.server is not None:
+            return self.server._databank._slaves
+
 
 class ModbusMaster(object):
     # to fix:

@@ -2,6 +2,18 @@
 #:import KivyLexer kivy.extras.highlight.KivyLexer
 #:import ListItemButton kivy.uix.listview.ListItemButton
 #:import sla kivy.adapters.listadapter
+<Separator@Widget>
+    size_hint_y: None
+    thickness: 2
+    margin: 2
+    height: self.thickness + 2 * self.margin
+    color: .5, .5, .5
+    canvas:
+        Color:
+            rgb: self.color
+        Rectangle:
+            pos: self.x + self.margin, self.y + self.margin + 1
+            size: self.width - 2 * self.margin , self.thickness
 
 <DataModal>:
 <FloatInput>:
@@ -14,6 +26,7 @@
     interface_settings: interface_settings
     orientation: 'vertical'
     start_stop_server: start_stop_server
+    data_count: data_count
     data_model_coil: coils
     data_model_discrete_inputs: discrete_inputs
     data_model_input_registers: input_registers
@@ -80,6 +93,7 @@
             width: '108sp'
             text: 'Start'
             on_release: root.start_server(*args)
+    Separator:
     BoxLayout:
         id: reactive_layout
         orientation: 'vertical' if self.width < self.height else 'horizontal'
@@ -111,6 +125,7 @@
                 Label:
                     text: "modbus slaves"
                     size_hint_y: .05
+                Separator:
                 BoxLayout:
                     orientation: 'horizontal'
                     padding: '2sp'
@@ -133,6 +148,7 @@
                     ToggleButton:
                         id: enable_slaves
                         text: "enable all"
+                Separator:
                 BoxLayout:
                     orientation: 'vertical'
                     padding: '2sp'
@@ -207,6 +223,25 @@
                         pos: self.pos
                 size_hint: 1, None
                 height: '45sp'
+                Label:
+                    id: add_data
+                    text: "Count"
+                Widget:
+                FloatInput:
+                    id: data_count
+                    text: "10"
+            Separator:
+            BoxLayout:
+                orientation: 'horizontal'
+                padding: '2sp'
+                canvas:
+                    Color:
+                        rgba: 1, 1, 1, .25
+                    Rectangle:
+                        size: self.size
+                        pos: self.pos
+                size_hint: 1, None
+                height: '45sp'
                 Button:
                     id: add_data
                     text: "add"
@@ -216,6 +251,7 @@
                     id: delete_data
                     text: "delete"
                     on_release: root.delete_data_entry(*args)
+            Separator:
             TabbedPanel:
                 id: data_model_screen
                 fullscreen: True
