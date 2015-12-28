@@ -1,3 +1,7 @@
+# NOTE:
+This project is moved to [gitlab] (https://gitlab.com/dhoomakethu/kivy-modbus-simu) .
+A newer version with support to serial mode is available there.
+
 # Modbus Simulator
 
 Modbus Simulator with GUI based on modbus-tk
