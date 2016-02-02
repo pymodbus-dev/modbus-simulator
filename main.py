@@ -250,7 +250,8 @@ class Gui(BoxLayout):
                 self.config.get('Modbus Serial', "writetimeout")))
             kwargs["timeout"] = bool(eval(
                 self.config.get('Modbus Serial', "timeout")))
-
+        elif self.active_server == 'tcp':
+            kwargs['address'] = self.config.get('Modbus Tcp', 'ip')
         if not self.modbus_device:
             create_new = True
         else:
