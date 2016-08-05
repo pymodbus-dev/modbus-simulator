@@ -1,6 +1,10 @@
 # NOTE:
+## 1
 This project is moved to [gitlab] (https://gitlab.com/dhoomakethu/kivy-modbus-simu) .
 A newer version with support to serial mode is available there.
+
+## 2
+A cli version supporting both Modbus_RTU and Modbus_TCP is available here [modbus_simu_cli](https://github.com/dhoomakethu/modbus_sim_cli)
 
 # Modbus Simulator
 
