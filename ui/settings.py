@@ -1,17 +1,8 @@
-from kivy.uix.settings import (SettingNumeric,
-                               SettingBoolean, SettingItem, SettingSpacer)
-from kivy.properties import (BoundedNumericProperty,
-                             ListProperty,
+from kivy.uix.settings import SettingItem
+from kivy.properties import (ListProperty,
                              ObjectProperty)
-from kivy.compat import string_types, text_type
+from kivy.compat import text_type
 from kivy.lang import Builder
-from kivy.uix.boxlayout import BoxLayout
-from kivy.core.window import Window
-from kivy.uix.popup import Popup
-from kivy.uix.textinput import TextInput
-from kivy.uix.widget import Widget
-from kivy.uix.button import Button
-from kivy.metrics import dp
 
 kv = '''<SettingIntegerWithRange>:
     textinput: textinput

@@ -5,21 +5,21 @@ Modbus Simu App
 import kivy
 kivy.require('1.4.2')
 from kivy.app import App
-from kivy.properties import ObjectProperty, NumericProperty
+from kivy.properties import ObjectProperty
 from kivy.uix.boxlayout import BoxLayout
 from kivy.animation import Animation
-from kivy.uix.label import Label
 from kivy.uix.textinput import TextInput
-from kivy.uix.settings import (Settings, SettingsWithSidebar)
+from kivy.uix.settings import SettingsWithSidebar
 from kivy.uix.listview import ListView, ListItemButton
 from kivy.adapters.listadapter import ListAdapter
-import DataModel
-from modbus import ModbusSimu, BLOCK_TYPES, configure_modbus_logger
-from settings import SettingIntegerWithRange
-from backgroundJob import BackgroundJob
+from utils.modbus import ModbusSimu, BLOCK_TYPES, configure_modbus_logger
+from ui.settings import SettingIntegerWithRange
+from utils.backgroundJob import BackgroundJob
 import re
 import os
 from kivy.config import Config
+from kivy.lang import Builder
+import ui.datamodel
 
 MAP = {
     "coils": "coils",
@@ -27,6 +27,8 @@ MAP = {
     'input registers': 'input_registers',
     'holding registers': 'holding_registers'
 }
+
+Builder.load_file("templates/modbussimu.kv")
 
 
 class FloatInput(TextInput):
@@ -43,9 +45,9 @@ class FloatInput(TextInput):
 
 
 class Gui(BoxLayout):
-    '''
+    """
     Gui of widgets. This is the root widget of the app.
-    '''
+    """
 
     # ---------------------GUI------------------------ #
     # Checkbox to select between tcp/serial
@@ -167,7 +169,6 @@ class Gui(BoxLayout):
     @data_map.setter
     def data_map(self, value):
         self._data_map[self.active_server] = value
-
 
     def _init_coils(self):
         time_interval = int(eval(self.config.get("Simulation",

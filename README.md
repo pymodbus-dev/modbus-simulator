@@ -15,15 +15,16 @@ Modbus Simulator with GUI based on modbus-tk
     - [OSx](https://kivy.org/docs/installation/installation-osx.html)
     - [Linux](http://kivy.org/docs/installation/installation-linux.html#ubuntu-11-10-or-newer)
     - [Windows](http://kivy.org/docs/installation/installation-windows.html)
+2. create virtualenv and install requirements
 
-2. install modbus-tk
-    * On Mac kivy uses its own virtual env ,hence all required modules needs to be installed seperatly [installing modules](http://kivy.org/docs/installation/installation-macosx.html#installing-modules)
-        - kivy -m pip install modbus-tk
+
+    $ pip install -r requirements
+
 3. [Setup development environment](https://github.com/kivy/kivy/wiki/Setting-Up-Kivy-with-various-popular-IDE's)
 
 ## Running/Testing application
-    $ cd modbus_simulator
-    $ kivy main.py
+    $ ./tools/launcher
+    
 A GUi should show up if all the requirements are met !!
 
 ![Screen Shot 2015-11-01 at 7.25.50 PM.png](https://bitbucket.org/repo/X9byrq/images/4179375251-Screen%20Shot%202015-11-01%20at%207.25.50%20PM.png)
@@ -48,7 +49,7 @@ A GUi should show up if all the requirements are met !!
 ## Packaging for different OS (Standalone applications)
 A standalone application specific to target OS can be created with Kivy package manager
 
-1. [OSX](http://kivy.org/docs/guide/packaging-macosx.html)
+1. [OSX](https://kivy.org/docs/guide/packaging-osx.html)
 2. [Linux](http://bitstream.io/packaging-and-distributing-a-kivy-application-on-linux.html)
 3. [Windows](http://kivy.org/docs/guide/packaging-windows.html)
 

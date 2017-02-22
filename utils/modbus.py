@@ -1,12 +1,15 @@
 from __future__ import absolute_import, unicode_literals
-from modbus_tk.modbus_tcp import TcpServer, TcpMaster
-from modbus_tk.modbus_rtu import RtuServer, RtuMaster
+
+import logging
+import os
+
+import serial
 from modbus_tk.defines import (
     COILS, DISCRETE_INPUTS, HOLDING_REGISTERS, ANALOG_INPUTS)
-import logging
-from common import path, make_dir, remove_file
-import os
-import serial
+from modbus_tk.modbus_rtu import RtuServer, RtuMaster
+from modbus_tk.modbus_tcp import TcpServer, TcpMaster
+
+from utils.common import path, make_dir, remove_file
 
 ADDRESS_RANGE = {
     COILS: 0,

@@ -59,7 +59,7 @@ docs/_build/
 target/
 
 #PyCharms
-*.idea
+.idea
 
 #IniFiles
 *.ini
