@@ -12,7 +12,7 @@ Modbus Simulator with GUI based on modbus-tk
 
 ## Development Instructions
 1. install kivy
-    - [OSx](http://kivy.org/docs/installation/installation-macosx.html)
+    - [OSx](https://kivy.org/docs/installation/installation-osx.html)
     - [Linux](http://kivy.org/docs/installation/installation-linux.html#ubuntu-11-10-or-newer)
     - [Windows](http://kivy.org/docs/installation/installation-windows.html)
 
