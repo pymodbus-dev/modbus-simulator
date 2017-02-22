@@ -1,23 +1,21 @@
-from kivy.adapters.dictadapter import DictAdapter
-from kivy.uix.listview import ListItemButton, ListItemLabel, \
-        CompositeListItem, ListView, SelectableView
-from kivy.uix.gridlayout import GridLayout
-
-
-from kivy.uix.label import Label
-from kivy.uix.textinput import TextInput
-from kivy.properties import BooleanProperty, ObjectProperty, NumericProperty
-from kivy.uix.popup import Popup
-from kivy.uix.button import Button
-from kivy.uix.boxlayout import BoxLayout
-from kivy.clock import Clock
-from kivy.lang import Builder
-from kivy.event import EventDispatcher
-from kivy.logger import Logger
-from backgroundJob import BackgroundJob
-
 from random import randint
-Builder.load_file("datamodel.kv")
+
+from kivy.adapters.dictadapter import DictAdapter
+from kivy.event import EventDispatcher
+from kivy.lang import Builder
+from kivy.logger import Logger
+from kivy.properties import BooleanProperty, NumericProperty
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.button import Button
+from kivy.uix.gridlayout import GridLayout
+from kivy.uix.label import Label
+from kivy.uix.listview import ListItemButton, CompositeListItem, ListView, SelectableView
+from kivy.uix.popup import Popup
+from kivy.uix.textinput import TextInput
+
+from utils.backgroundJob import BackgroundJob
+
+Builder.load_file("templates/datamodel.kv")
 
 integers_dict = {}
 
