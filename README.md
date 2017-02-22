@@ -16,9 +16,11 @@ Modbus Simulator with GUI based on modbus-tk
     - [Linux](http://kivy.org/docs/installation/installation-linux.html#ubuntu-11-10-or-newer)
     - [Windows](http://kivy.org/docs/installation/installation-windows.html)
 2. create virtualenv and install requirements
-
-
+   
+    ```
     $ pip install -r requirements
+    ```
+
 
 3. [Setup development environment](https://github.com/kivy/kivy/wiki/Setting-Up-Kivy-with-various-popular-IDE's)
 
