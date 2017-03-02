@@ -23,6 +23,8 @@
     data_models: data_model_screen
     info_label: info_lbl
     interfaces: interfaces
+    tcp: chkbx
+    serial: chkbx2
     port: txtBox
     interface_settings: interface_settings
     orientation: 'vertical'
@@ -70,7 +72,7 @@
                 Label:
                     text: "Serial"
                 CheckBox:
-                    id: "chkbx2"
+                    id: chkbx2
                     group: "interface"
                     on_active: root.update_serial_connection_info(*args)
         Widget:

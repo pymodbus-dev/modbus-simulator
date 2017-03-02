@@ -17,6 +17,7 @@ from ui.settings import SettingIntegerWithRange
 from utils.backgroundJob import BackgroundJob
 import re
 import os
+import json
 from kivy.config import Config
 from kivy.lang import Builder
 import ui.datamodel
@@ -52,6 +53,9 @@ class Gui(BoxLayout):
     # ---------------------GUI------------------------ #
     # Checkbox to select between tcp/serial
     interfaces = ObjectProperty()
+
+    tcp = ObjectProperty()
+    serial = ObjectProperty()
 
     # Boxlayout to hold interface settings
     interface_settings = ObjectProperty()
@@ -282,30 +286,34 @@ class Gui(BoxLayout):
 
     def start_server(self, btn):
         if btn.state == "down":
-            self._create_modbus_device()
-
-            self.modbus_device.start()
-            self.server_running = True
-            self.interface_settings.disabled = True
-            self.interfaces.disabled = True
-            self.slave_pane.disabled = False
-            if len(self.slave_list.adapter.selection):
-                self.data_model_loc.disabled = False
-                if self.simulating:
-                    self._simulate()
-
+            self._start_server()
             btn.text = "Stop"
-
         else:
-            self.simulating = False
-            self._simulate()
-            self.modbus_device.stop()
-            self.server_running = False
-            self.interface_settings.disabled = False
-            self.interfaces.disabled = False
-            self.slave_pane.disabled = True
-            self.data_model_loc.disabled = True
+            self._stop_server()
             btn.text = "Start"
+
+    def _start_server(self):
+        self._create_modbus_device()
+
+        self.modbus_device.start()
+        self.server_running = True
+        self.interface_settings.disabled = True
+        self.interfaces.disabled = True
+        self.slave_pane.disabled = False
+        if len(self.slave_list.adapter.selection):
+            self.data_model_loc.disabled = False
+            if self.simulating:
+                self._simulate()
+
+    def _stop_server(self):
+        self.simulating = False
+        self._simulate()
+        self.modbus_device.stop()
+        self.server_running = False
+        self.interface_settings.disabled = False
+        self.interfaces.disabled = False
+        self.slave_pane.disabled = True
+        self.data_model_loc.disabled = True
 
     def update_tcp_connection_info(self, checkbox, value):
         self.active_server = "tcp"
@@ -325,7 +333,6 @@ class Gui(BoxLayout):
                 self.last_active_port['serial'] = '/dev/ptyp0'
             self.port.text = self.last_active_port['serial']
             self._restore()
-
         else:
             self.last_active_port['serial'] = self.port.text
             self._backup()
@@ -341,10 +348,14 @@ class Gui(BoxLayout):
         selected = self.slave_list.adapter.selection
         data = self.slave_list.adapter.data
         ret = self._process_slave_data(data)
+        self._add_slaves(selected, data, ret)
+
+    def _add_slaves(self, selected, data, ret):
         if ret[0]:
             start_slave_add, slave_count = ret[1:]
         else:
             return
+
         for slave_to_add in xrange(start_slave_add,
                                    start_slave_add + slave_count):
             if str(slave_to_add) in self.data_map:
@@ -378,7 +389,7 @@ class Gui(BoxLayout):
             self.modbus_device.add_slave(slave_to_add)
             for block_name, block_type in BLOCK_TYPES.items():
                 self.modbus_device.add_block(slave_to_add,
-                    block_name, block_type, self.block_start, self.block_size)
+                                             block_name, block_type, self.block_start, self.block_size)
 
             data.append(str(slave_to_add))
         self.slave_list.adapter.data = data
@@ -452,25 +463,32 @@ class Gui(BoxLayout):
             self.data_map.pop(slave)
 
     def update_data_models(self, *args):
-        ct = self.data_models.current_tab
+        active = self.active_slave
+        tab = self.data_models.current_tab
+        count = self.data_count.text
+        self._update_data_models(active, tab, count, 1)
+
+    def _update_data_models(self, active, tab, count, value):
+        ct = tab
         current_tab = MAP[ct.text]
 
         ct.content.update_view()
         # self.data_map[self.active_slave][current_tab]['dirty'] = False
-        _data = self.data_map[self.active_slave][current_tab]
+        _data = self.data_map[active][current_tab]
         item_strings = _data['item_strings']
-        for i in xrange(int(self.data_count.text)):
+        for i in xrange(int(count)):
             if len(item_strings) < self.block_size:
-                updated_data, item_strings = ct.content.add_data(1, item_strings)
+                _value = 1 if isinstance(value, int) else value[i]
+                updated_data, item_strings = ct.content.add_data(_value, item_strings)
                 _data['data'].update(updated_data)
                 _data['item_strings'] = item_strings
                 for k, v in updated_data.iteritems():
-                    self.modbus_device.set_values(int(self.active_slave),
+                    self.modbus_device.set_values(int(active),
                                                   current_tab, k, v)
             else:
                 msg = ("OutOfModbusBlockError: address %s"
-                       " is out of block size %s" %(len(item_strings),
-                                                    self.block_size))
+                       " is out of btmuxlock size %s" % (len(item_strings),
+                                                     self.block_size))
                 self.show_error(msg)
                 break
 
@@ -831,16 +849,88 @@ class ModbusSimuApp(App):
     settings_cls = SettingsWithSidebar
 
     def build(self):
-
         self.gui = Gui(
             modbus_log=os.path.join(self.user_data_dir, 'modbus.log')
         )
+        if os.path.exists('slaves.txt') and os.path.isfile('slaves.txt'):
+            with open('slaves.txt', 'r') as f:
+                data = json.load(f)
+                try:
+                    init = 0
+                    i = 0
+                    count = 1
+                    l = data['slave_list']
+                    self.gui.active_server = data['active_server']
+                    self.gui.port.text = data['port']
+                    self.gui._start_server()
+
+                    if data['active_server'] == 'tcp':
+                        self.gui.serial.active = False
+                        self.gui.update_serial_connection_info(self.gui.serial, False)
+                        self.gui.tcp.active = True
+                        self.gui.update_tcp_connection_info(self.gui.tcp, True)
+                    else:
+                        self.gui.tcp.active = False
+                        self.gui.update_tcp_connection_info(self.gui.tcp, False)
+                        self.gui.serial.active = True
+                        self.gui.update_serial_connection_info(self.gui.serial, True)
+
+                    # !!could be Improved
+                    while i < len(l)-1:
+                        if l[i]+1 == l[i+1]:
+                            count += 1
+                        else:
+                            self.gui._add_slaves(
+                                self.gui.slave_list.adapter.selection,
+                                self.gui.slave_list.adapter.data,
+                                (True, l[init], count)
+                            )
+                            init = i+1
+                            count = 1
+                        i += 1
+                    self.gui._add_slaves(
+                        self.gui.slave_list.adapter.selection,
+                        self.gui.slave_list.adapter.data,
+                        (True, l[init], count)
+                    )
+
+                    m = {
+                            'coils': self.gui.data_models.tab_list[3],
+                            'discrete_inputs': self.gui.data_models.tab_list[2],
+                            'input_registers': self.gui.data_models.tab_list[1],
+                            'holding_registers': self.gui.data_models.tab_list[0]
+                        }
+                    mem = data['m']
+                    for l in mem:
+                        active, tab, count = l
+                        self.gui._update_data_models(active, m[tab], len(count), count.values())
+
+                    self.gui.start_stop_server.state = "down"
+                    self.gui.start_stop_server.text = "Stop"
+
+                except Exception as e:
+                    raise
+
         return self.gui
 
     def on_pause(self):
         return True
 
     def on_stop(self):
+        # will write to the default App config file modbussimu.ini
+        self.config.write()
+        with open('slaves.txt', 'w') as f_o:
+            slave = [int(slave_no) for slave_no in self.gui.slave_list.adapter.data]
+            active = self.gui.active_server
+            port = self.gui.port.text
+            m = []
+            for slaves, mem in self.gui.data_map.iteritems():
+                for name, value in mem.iteritems():
+                    if len(value['data']) != 0:
+                        m.append((slaves, name, value['data']))
+
+            json.dump(dict(slave_list=slave, active_server=active, port=port, m=m), f_o)
+
         if self.gui.server_running:
             if self.gui.simulating:
                 self.gui.simulating = False
