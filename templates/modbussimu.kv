@@ -294,6 +294,9 @@
                 app_icon: 'assets/riptideLogo.png'
                 disabled: True
             ActionOverflow:
+            ActionButton:
+                text: 'Reset'
+                on_release: root.reset_state(*args)
             ActionToggleButton:
                 text: 'Simulate'
                 on_release: root.start_stop_simulation(*args)

@@ -17,7 +17,7 @@ from ui.settings import SettingIntegerWithRange
 from utils.backgroundJob import BackgroundJob
 import re
 import os
-import json
+from json import load, dump
 from kivy.config import Config
 from kivy.lang import Builder
 import ui.datamodel
@@ -28,6 +28,8 @@ MAP = {
     'input registers': 'input_registers',
     'holding registers': 'holding_registers'
 }
+
+SLAVES_FILE = 'slaves.json'
 
 Builder.load_file("templates/modbussimu.kv")
 
@@ -149,6 +151,7 @@ class Gui(BoxLayout):
                             "rtu": [self.slave_start_add.text,
                                     self.slave_end_add.text,
                                     self.slave_count.text]}
+        self.reset = False
 
     @property
     def modbus_device(self):
@@ -641,6 +644,13 @@ class Gui(BoxLayout):
          self.slave_count.text) = self._slave_misc[self.active_server]
         self.slave_list._trigger_reset_populate()
 
+    def reset_state(self, *args):
+        if os.path.isfile(SLAVES_FILE):
+            os.remove(SLAVES_FILE)
+        if os.path.isfile('modbussimu.ini'):
+            os.remove('modbussimu.ini')
+        self.reset = True
+
 setting_panel = """
 [
   {
@@ -852,64 +862,61 @@ class ModbusSimuApp(App):
         self.gui = Gui(
             modbus_log=os.path.join(self.user_data_dir, 'modbus.log')
         )
-        if os.path.exists('slaves.txt') and os.path.isfile('slaves.txt'):
-            with open('slaves.txt', 'r') as f:
-                data = json.load(f)
-                try:
-                    init = 0
-                    i = 0
-                    count = 1
-                    l = data['slave_list']
-                    self.gui.active_server = data['active_server']
-                    self.gui.port.text = data['port']
-                    self.gui._start_server()
+        if os.path.isfile(SLAVES_FILE):
+            with open(SLAVES_FILE, 'r') as f:
+                data = load(f)
 
-                    if data['active_server'] == 'tcp':
-                        self.gui.serial.active = False
-                        self.gui.update_serial_connection_info(self.gui.serial, False)
-                        self.gui.tcp.active = True
-                        self.gui.update_tcp_connection_info(self.gui.tcp, True)
+                l = data['slave_list']
+                self.gui.active_server = data['active_server']
+                self.gui.port.text = data['port']
+                self.gui._start_server()
+
+                if data['active_server'] == 'tcp':
+                    self.gui.serial.active = False
+                    self.gui.update_serial_connection_info(self.gui.serial, False)
+                    self.gui.tcp.active = True
+                    self.gui.update_tcp_connection_info(self.gui.tcp, True)
+                else:
+                    self.gui.tcp.active = False
+                    self.gui.update_tcp_connection_info(self.gui.tcp, False)
+                    self.gui.serial.active = True
+                    self.gui.update_serial_connection_info(self.gui.serial, True)
+
+                init = 0
+                i = 0
+                count = 1
+                # !!could be Improved
+                while i < len(l)-1:
+                    if l[i]+1 == l[i+1]:
+                        count += 1
                     else:
-                        self.gui.tcp.active = False
-                        self.gui.update_tcp_connection_info(self.gui.tcp, False)
-                        self.gui.serial.active = True
-                        self.gui.update_serial_connection_info(self.gui.serial, True)
+                        self.gui._add_slaves(
+                            self.gui.slave_list.adapter.selection,
+                            self.gui.slave_list.adapter.data,
+                            (True, l[init], count)
+                        )
+                        init = i+1
+                        count = 1
+                    i += 1
+                self.gui._add_slaves(
+                    self.gui.slave_list.adapter.selection,
+                    self.gui.slave_list.adapter.data,
+                    (True, l[init], count)
+                )
 
-                    # !!could be Improved
-                    while i < len(l)-1:
-                        if l[i]+1 == l[i+1]:
-                            count += 1
-                        else:
-                            self.gui._add_slaves(
-                                self.gui.slave_list.adapter.selection,
-                                self.gui.slave_list.adapter.data,
-                                (True, l[init], count)
-                            )
-                            init = i+1
-                            count = 1
-                        i += 1
-                    self.gui._add_slaves(
-                        self.gui.slave_list.adapter.selection,
-                        self.gui.slave_list.adapter.data,
-                        (True, l[init], count)
-                    )
+                m = {
+                        'coils': self.gui.data_models.tab_list[3],
+                        'discrete_inputs': self.gui.data_models.tab_list[2],
+                        'input_registers': self.gui.data_models.tab_list[1],
+                        'holding_registers': self.gui.data_models.tab_list[0]
+                    }
+                mem = data['m']
+                for l in mem:
+                    active, tab, count = l
+                    self.gui._update_data_models(active, m[tab], len(count), count.values())
 
-                    m = {
-                            'coils': self.gui.data_models.tab_list[3],
-                            'discrete_inputs': self.gui.data_models.tab_list[2],
-                            'input_registers': self.gui.data_models.tab_list[1],
-                            'holding_registers': self.gui.data_models.tab_list[0]
-                        }
-                    mem = data['m']
-                    for l in mem:
-                        active, tab, count = l
-                        self.gui._update_data_models(active, m[tab], len(count), count.values())
-
-                    self.gui.start_stop_server.state = "down"
-                    self.gui.start_stop_server.text = "Stop"
-
-                except Exception as e:
-                    raise
+                self.gui.start_stop_server.state = "down"
+                self.gui.start_stop_server.text = "Stop"
 
         return self.gui
 
@@ -918,18 +925,19 @@ class ModbusSimuApp(App):
 
     def on_stop(self):
         # will write to the default App config file modbussimu.ini
-        self.config.write()
-        with open('slaves.txt', 'w') as f_o:
-            slave = [int(slave_no) for slave_no in self.gui.slave_list.adapter.data]
-            active = self.gui.active_server
-            port = self.gui.port.text
-            m = []
-            for slaves, mem in self.gui.data_map.iteritems():
-                for name, value in mem.iteritems():
-                    if len(value['data']) != 0:
-                        m.append((slaves, name, value['data']))
+        if not self.gui.reset:
+            self.config.write()
+            with open(SLAVES_FILE, 'w') as f:
+                slave = [int(slave_no) for slave_no in self.gui.slave_list.adapter.data]
+                active = self.gui.active_server
+                port = self.gui.port.text
+                m = []
+                for slaves, mem in self.gui.data_map.iteritems():
+                    for name, value in mem.iteritems():
+                        if len(value['data']) != 0:
+                            m.append((slaves, name, value['data']))
 
-            json.dump(dict(slave_list=slave, active_server=active, port=port, m=m), f_o)
+                dump(dict(slave_list=slave, active_server=active, port=port, m=m), f)
 
         if self.gui.server_running:
             if self.gui.simulating:
