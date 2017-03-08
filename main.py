@@ -322,6 +322,8 @@ class Gui(BoxLayout):
         self.active_server = "tcp"
         if value:
             self.interface_settings.current = checkbox
+            if self.last_active_port['tcp'] == "":
+                self.last_active_port['tcp'] = 5440
             self.port.text = self.last_active_port['tcp']
             self._restore()
         else:
@@ -651,6 +653,77 @@ class Gui(BoxLayout):
             os.remove('modbussimu.ini')
         self.reset = True
 
+    def save_conf(self):
+        if not self.reset:
+            with open(SLAVES_FILE, 'w') as f:
+                slave = [int(slave_no) for slave_no in self.slave_list.adapter.data]
+                slaves_memory = []
+                for slaves, mem in self.data_map.iteritems():
+                    for name, value in mem.iteritems():
+                        if len(value['data']) != 0:
+                            slaves_memory.append((slaves, name, value['data']))
+
+                dump(dict(
+                    slaves_list=slave, active_server=self.active_server,
+                    port=self.port.text, slaves_memory=slaves_memory,
+                ), f, indent=4)
+
+    def load_conf(self):
+        if not os.path.isfile(SLAVES_FILE):
+            return
+
+        with open(SLAVES_FILE, 'r') as f:
+            data = load(f)
+
+            self.active_server = data['active_server']
+            self.port.text = data['port']
+
+            slaves_list = data['slaves_list']
+            if not len(slaves_list):
+                return
+
+            if data['active_server'] == 'tcp':
+                self.tcp.active = True
+                self.serial.active = False
+                self.interface_settings.current = self.tcp
+            else:
+                self.tcp.active = False
+                self.serial.active = True
+                self.interface_settings.current = self.serial
+
+            self._create_modbus_device()
+
+            start_slave = 0
+            temp_list = []
+            slave_count = 1
+            for first, second in zip(slaves_list[:-1], slaves_list[1:]):
+                if first+1 == second:
+                    slave_count += 1
+                else:
+                    temp_list.append((slaves_list[start_slave], slave_count))
+                    start_slave += slave_count
+                    slave_count = 1
+            temp_list.append((slaves_list[start_slave], slave_count))
+
+            for start_slave, slave_count in temp_list:
+                self._add_slaves(
+                    self.slave_list.adapter.selection,
+                    self.slave_list.adapter.data,
+                    (True, start_slave, slave_count)
+                )
+
+            memory_map = {
+                'coils': self.data_models.tab_list[3],
+                'discrete_inputs': self.data_models.tab_list[2],
+                'input_registers': self.data_models.tab_list[1],
+                'holding_registers': self.data_models.tab_list[0]
+            }
+            slaves_memory = data['slaves_memory']
+            for slave_memory in slaves_memory:
+                active_slave, memory_type, memory_data = slave_memory
+                self._update_data_models(active_slave, memory_map[memory_type], len(memory_data), memory_data.values())
+
+
 setting_panel = """
 [
   {
@@ -862,62 +935,7 @@ class ModbusSimuApp(App):
         self.gui = Gui(
             modbus_log=os.path.join(self.user_data_dir, 'modbus.log')
         )
-        if os.path.isfile(SLAVES_FILE):
-            with open(SLAVES_FILE, 'r') as f:
-                data = load(f)
-
-                l = data['slave_list']
-                self.gui.active_server = data['active_server']
-                self.gui.port.text = data['port']
-                self.gui._start_server()
-
-                if data['active_server'] == 'tcp':
-                    self.gui.serial.active = False
-                    self.gui.update_serial_connection_info(self.gui.serial, False)
-                    self.gui.tcp.active = True
-                    self.gui.update_tcp_connection_info(self.gui.tcp, True)
-                else:
-                    self.gui.tcp.active = False
-                    self.gui.update_tcp_connection_info(self.gui.tcp, False)
-                    self.gui.serial.active = True
-                    self.gui.update_serial_connection_info(self.gui.serial, True)
-
-                init = 0
-                i = 0
-                count = 1
-                # !!could be Improved
-                while i < len(l)-1:
-                    if l[i]+1 == l[i+1]:
-                        count += 1
-                    else:
-                        self.gui._add_slaves(
-                            self.gui.slave_list.adapter.selection,
-                            self.gui.slave_list.adapter.data,
-                            (True, l[init], count)
-                        )
-                        init = i+1
-                        count = 1
-                    i += 1
-                self.gui._add_slaves(
-                    self.gui.slave_list.adapter.selection,
-                    self.gui.slave_list.adapter.data,
-                    (True, l[init], count)
-                )
-
-                m = {
-                        'coils': self.gui.data_models.tab_list[3],
-                        'discrete_inputs': self.gui.data_models.tab_list[2],
-                        'input_registers': self.gui.data_models.tab_list[1],
-                        'holding_registers': self.gui.data_models.tab_list[0]
-                    }
-                mem = data['m']
-                for l in mem:
-                    active, tab, count = l
-                    self.gui._update_data_models(active, m[tab], len(count), count.values())
-
-                self.gui.start_stop_server.state = "down"
-                self.gui.start_stop_server.text = "Stop"
-
+        self.gui.load_conf()
         return self.gui
 
     def on_pause(self):
@@ -925,20 +943,8 @@ class ModbusSimuApp(App):
 
     def on_stop(self):
         # will write to the default App config file modbussimu.ini
-        if not self.gui.reset:
-            self.config.write()
-            with open(SLAVES_FILE, 'w') as f:
-                slave = [int(slave_no) for slave_no in self.gui.slave_list.adapter.data]
-                active = self.gui.active_server
-                port = self.gui.port.text
-                m = []
-                for slaves, mem in self.gui.data_map.iteritems():
-                    for name, value in mem.iteritems():
-                        if len(value['data']) != 0:
-                            m.append((slaves, name, value['data']))
-
-                dump(dict(slave_list=slave, active_server=active, port=port, m=m), f)
-
+        self.config.write()
+        self.gui.save_conf()
         if self.gui.server_running:
             if self.gui.simulating:
                 self.gui.simulating = False
