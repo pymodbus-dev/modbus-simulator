@@ -369,6 +369,13 @@ class DataModel(GridLayout):
                                          self.blockname,
                                          self.list_view.adapter.data)
 
-
-
-
+    def reset_block_values(self):
+        if not self.simulate:
+            data = self.list_view.adapter.data
+            if data:
+                for index, value in data.items():
+                    data[index] = 1
+                self.list_view.adapter.data = data
+                self.list_view.disabled = False
+                self.list_view._trigger_reset_populate()
+                self._parent.sync_data_callback(self.blockname, self.list_view.adapter.data)

@@ -295,8 +295,11 @@
                 disabled: True
             ActionOverflow:
             ActionButton:
-                text: 'Reset'
-                on_release: root.reset_state(*args)
+                text: 'Reset State'
+                on_release: root.reset_state()
+            ActionButton:
+                text: 'Reset Simulation'
+                on_release: root.reset_simulation(*args)
             ActionToggleButton:
                 text: 'Simulate'
                 on_release: root.start_stop_simulation(*args)

@@ -151,7 +151,7 @@ class Gui(BoxLayout):
                             "rtu": [self.slave_start_add.text,
                                     self.slave_end_add.text,
                                     self.slave_count.text]}
-        self.reset = False
+        self.save = True
 
     @property
     def modbus_device(self):
@@ -598,6 +598,13 @@ class Gui(BoxLayout):
         self.data_model_holding_registers.start_stop_simulation(
             self.simulating)
 
+    def reset_simulation(self, *args):
+        if not self.simulating:
+            self.data_model_coil.reset_block_values()
+            self.data_model_discrete_inputs.reset_block_values()
+            self.data_model_input_registers.reset_block_values()
+            self.data_model_holding_registers.reset_block_values()
+
     def _sync_modbus_block_values(self):
         """
         track external changes in modbus block values and sync GUI
@@ -646,27 +653,23 @@ class Gui(BoxLayout):
          self.slave_count.text) = self._slave_misc[self.active_server]
         self.slave_list._trigger_reset_populate()
 
-    def reset_state(self, *args):
-        if os.path.isfile(SLAVES_FILE):
-            os.remove(SLAVES_FILE)
-        if os.path.isfile('modbussimu.ini'):
-            os.remove('modbussimu.ini')
-        self.reset = True
+    def reset_state(self):
+        self.save = False
 
     def save_conf(self):
-        if not self.reset:
-            with open(SLAVES_FILE, 'w') as f:
-                slave = [int(slave_no) for slave_no in self.slave_list.adapter.data]
-                slaves_memory = []
-                for slaves, mem in self.data_map.iteritems():
-                    for name, value in mem.iteritems():
-                        if len(value['data']) != 0:
-                            slaves_memory.append((slaves, name, value['data']))
+        with open(SLAVES_FILE, 'w') as f:
+            slave = [int(slave_no) for slave_no in self.slave_list.adapter.data]
+            slaves_memory = []
+            for slaves, mem in self.data_map.iteritems():
+                for name, value in mem.iteritems():
+                    if len(value['data']) != 0:
+                        slaves_memory.append((slaves, name, map(int, value['data'].values())))
 
-                dump(dict(
-                    slaves_list=slave, active_server=self.active_server,
-                    port=self.port.text, slaves_memory=slaves_memory,
-                ), f, indent=4)
+            dump(dict(
+                slaves_list=slave, active_server=self.active_server,
+                port=self.port.text, slaves_memory=slaves_memory,
+                save_state=self.save
+            ), f, indent=4)
 
     def load_conf(self):
         if not os.path.isfile(SLAVES_FILE):
@@ -675,8 +678,8 @@ class Gui(BoxLayout):
         with open(SLAVES_FILE, 'r') as f:
             data = load(f)
 
-            self.active_server = data['active_server']
-            self.port.text = data['port']
+            if not data['save_state']:
+                return
 
             slaves_list = data['slaves_list']
             if not len(slaves_list):
@@ -690,6 +693,9 @@ class Gui(BoxLayout):
                 self.tcp.active = False
                 self.serial.active = True
                 self.interface_settings.current = self.serial
+
+            self.active_server = data['active_server']
+            self.port.text = data['port']
 
             self._create_modbus_device()
 
@@ -721,7 +727,7 @@ class Gui(BoxLayout):
             slaves_memory = data['slaves_memory']
             for slave_memory in slaves_memory:
                 active_slave, memory_type, memory_data = slave_memory
-                self._update_data_models(active_slave, memory_map[memory_type], len(memory_data), memory_data.values())
+                self._update_data_models(active_slave, memory_map[memory_type], len(memory_data), memory_data)
 
 
 setting_panel = """
