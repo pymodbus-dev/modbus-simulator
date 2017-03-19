@@ -91,6 +91,8 @@ class Gui(BoxLayout):
     data_model_input_registers = ObjectProperty()
     data_model_holding_registers = ObjectProperty()
 
+    reset_sim_btn = ObjectProperty()
+
     # Helpers
     # slaves = ["%s" %i for i in xrange(1, 248)]
     _data_map = {"tcp": {}, "rtu": {}}
@@ -492,7 +494,7 @@ class Gui(BoxLayout):
                                                   current_tab, k, v)
             else:
                 msg = ("OutOfModbusBlockError: address %s"
-                       " is out of btmuxlock size %s" % (len(item_strings),
+                       " is out of block size %s" % (len(item_strings),
                                                      self.block_size))
                 self.show_error(msg)
                 break
@@ -585,8 +587,10 @@ class Gui(BoxLayout):
     def start_stop_simulation(self, btn):
         if btn.state == "down":
             self.simulating = True
+            self.reset_sim_btn.disabled = True
         else:
             self.simulating = False
+            self.reset_sim_btn.disabled = False
             if self.restart_simu:
                 self.restart_simu = False
         self._simulate()
@@ -677,6 +681,13 @@ class Gui(BoxLayout):
 
         with open(SLAVES_FILE, 'r') as f:
             data = load(f)
+
+            if 'active_server' not in data or 'port' not in data \
+                    or 'slaves_list' not in data or 'slaves_memory' not in data or \
+                    'save_state' not in data:
+                self.show_error("LoadError: Failed to Load Config Error "
+                                "\nSave Your Config File it will be overwritten")
+                return
 
             if not data['save_state']:
                 return
@@ -950,6 +961,8 @@ class ModbusSimuApp(App):
     def on_stop(self):
         # will write to the default App config file modbussimu.ini
         self.config.write()
+        if self.gui.server_running:
+            self.gui._stop_server()
         self.gui.save_conf()
         if self.gui.server_running:
             if self.gui.simulating:

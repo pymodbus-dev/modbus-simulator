@@ -41,6 +41,7 @@
     slave_start_add: slave_start_add
     slave_end_add: slave_end_add
     action_bar: action_bar
+    reset_sim_btn: reset_simulation
     BoxLayout:
         padding: '2sp'
         canvas:
@@ -298,6 +299,7 @@
                 text: 'Reset State'
                 on_release: root.reset_state()
             ActionButton:
+                id: reset_simulation
                 text: 'Reset Simulation'
                 on_release: root.reset_simulation(*args)
             ActionToggleButton:
