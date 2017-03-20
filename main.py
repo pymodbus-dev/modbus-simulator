@@ -680,7 +680,15 @@ class Gui(BoxLayout):
             return
 
         with open(SLAVES_FILE, 'r') as f:
-            data = load(f)
+            try:
+                data = load(f)
+            except ValueError as e:
+                self.show_error(
+                    "LoadError: Failed to Load : %s "
+                    "\nSave Your Config File it will be overwritten"
+                    % e.message
+                )
+                return
 
             if 'active_server' not in data or 'port' not in data \
                     or 'slaves_list' not in data or 'slaves_memory' not in data or \
