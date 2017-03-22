@@ -1,5 +1,0 @@
-#!/bin/bash
-
-root_dir="$(cd $(dirname $0)/..; pwd)"
-launch_cmd="$root_dir/main.py"
-python $launch_cmd

@@ -20,14 +20,15 @@ setup(
     version="0.1",
     description="Modbus Simulator using modbus_tk and kivy",
     long_description=readme(),
-    classifiers=[
-        "Programming Language : Python : 2.7",
-        "Simulator : Modbus Simulator",
-    ],
     keywords="Modbus Simulator",
     author="riptideio",
     packages=find_packages(),
-    install_requires=install_requires,
-    scripts=['tools/launcher'],
+    install_requires=install_requires(),
+    scripts=['modbus_simulator/tools/modbus_simu.py'],
+    entry_points={
+        'console_scripts': [
+            'modbus_simu = modbus_simulator.main:run',
+        ],
+    },
     include_package_data=True
 )

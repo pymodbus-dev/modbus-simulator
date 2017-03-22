@@ -9,7 +9,7 @@ from modbus_tk.defines import (
 from modbus_tk.modbus_rtu import RtuServer, RtuMaster
 from modbus_tk.modbus_tcp import TcpServer, TcpMaster
 
-from utils.common import path, make_dir, remove_file
+from modbus_simulator.utils.common import path, make_dir, remove_file
 
 ADDRESS_RANGE = {
     COILS: 0,

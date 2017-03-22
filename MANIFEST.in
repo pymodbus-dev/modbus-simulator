@@ -1,4 +1,5 @@
 include requirements
 include README.md
-include assets/*
-include templates/*
+include modbus_simulator/assets/*.png
+include modbus_simulator/assets/*.ico
+include modbus_simulator/templates/*.kv

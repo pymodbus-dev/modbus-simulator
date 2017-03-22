@@ -2,6 +2,7 @@
 #:import KivyLexer kivy.extras.highlight.KivyLexer
 #:import ListItemButton kivy.uix.listview.ListItemButton
 #:import sla kivy.adapters.listadapter
+
 <Separator@Widget>
     size_hint_y: None
     thickness: 2
@@ -38,7 +39,8 @@
     slave_pane: slave_pane
     slave_start_add: slave_start_add
     slave_end_add: slave_end_add
-    action_bar: action_bar
+    settings: settings
+    riptide_logo: riptide_logo
     BoxLayout:
         padding: '2sp'
         canvas:
@@ -288,16 +290,16 @@
         ActionView:
             use_separator: True
             ActionPrevious:
+                id: riptide_logo
                 with_previous: False
-                app_icon: 'assets/riptideLogo.png'
                 disabled: True
             ActionOverflow:
             ActionToggleButton:
                 text: 'Simulate'
                 on_release: root.start_stop_simulation(*args)
             ActionButton:
+                id: settings
                 text: 'settings'
-                icon: 'assets/Control-Panel.png'
                 on_release: app.show_settings(*args)
 
 
