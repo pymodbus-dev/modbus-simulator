@@ -153,7 +153,6 @@ class Gui(BoxLayout):
                             "rtu": [self.slave_start_add.text,
                                     self.slave_end_add.text,
                                     self.slave_count.text]}
-        self.save = True
 
     @property
     def modbus_device(self):
@@ -657,10 +656,7 @@ class Gui(BoxLayout):
          self.slave_count.text) = self._slave_misc[self.active_server]
         self.slave_list._trigger_reset_populate()
 
-    def reset_state(self):
-        self.save = False
-
-    def save_conf(self):
+    def save_state(self):
         with open(SLAVES_FILE, 'w') as f:
             slave = [int(slave_no) for slave_no in self.slave_list.adapter.data]
             slaves_memory = []
@@ -671,12 +667,12 @@ class Gui(BoxLayout):
 
             dump(dict(
                 slaves_list=slave, active_server=self.active_server,
-                port=self.port.text, slaves_memory=slaves_memory,
-                save_state=self.save
+                port=self.port.text, slaves_memory=slaves_memory
             ), f, indent=4)
 
-    def load_conf(self):
-        if not os.path.isfile(SLAVES_FILE):
+    def load_state(self):
+        if not bool(eval(self.config.get("State", "Load State"))) and \
+                not os.path.isfile(SLAVES_FILE):
             return
 
         with open(SLAVES_FILE, 'r') as f:
@@ -691,13 +687,9 @@ class Gui(BoxLayout):
                 return
 
             if 'active_server' not in data or 'port' not in data \
-                    or 'slaves_list' not in data or 'slaves_memory' not in data or \
-                    'save_state' not in data:
+                    or 'slaves_list' not in data or 'slaves_memory' not in data:
                 self.show_error("LoadError: Failed to Load Config Error "
                                 "\nSave Your Config File it will be overwritten")
-                return
-
-            if not data['save_state']:
                 return
 
             slaves_list = data['slaves_list']
@@ -937,11 +929,21 @@ setting_panel = """
   {
     "type": "numeric",
     "title": "Time interval",
-    "desc": "When simulation is enabled, data is changed for eveery 'n' seconds defined here",
+    "desc": "When simulation is enabled, data is changed for every 'n' seconds defined here",
     "section": "Simulation",
     "key": "time interval"
+  },
+  {
+    "type": "title",
+    "title": "State"
+  },
+  {
+    "type": "bool",
+    "title": "Load State",
+    "desc": "Whether the previous state should be loaded or not, if not the original state is loaded",
+    "section": "State",
+    "key": "Load State"
   }
-
 
 ]
 """
@@ -960,7 +962,7 @@ class ModbusSimuApp(App):
         self.gui = Gui(
             modbus_log=os.path.join(self.user_data_dir, 'modbus.log')
         )
-        self.gui.load_conf()
+        self.gui.load_state()
         return self.gui
 
     def on_pause(self):
@@ -971,7 +973,7 @@ class ModbusSimuApp(App):
         self.config.write()
         if self.gui.server_running:
             self.gui._stop_server()
-        self.gui.save_conf()
+        self.gui.save_state()
         if self.gui.server_running:
             if self.gui.simulating:
                 self.gui.simulating = False
@@ -1015,6 +1017,9 @@ class ModbusSimuApp(App):
 
         config.add_section('Simulation')
         config.set('Simulation', 'time interval', 1)
+
+        config.add_section('State')
+        config.set('State', 'Load State', 1)
 
     def build_settings(self, settings):
         settings.register_type("numeric_range", SettingIntegerWithRange)
