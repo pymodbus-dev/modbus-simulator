@@ -671,7 +671,7 @@ class Gui(BoxLayout):
             ), f, indent=4)
 
     def load_state(self):
-        if not bool(eval(self.config.get("State", "Load State"))) and \
+        if not bool(eval(self.config.get("State", "load state"))) or \
                 not os.path.isfile(SLAVES_FILE):
             return
 
@@ -680,16 +680,15 @@ class Gui(BoxLayout):
                 data = load(f)
             except ValueError as e:
                 self.show_error(
-                    "LoadError: Failed to Load : %s "
-                    "\nSave Your Config File it will be overwritten"
+                    "LoadError: Failed to Load State : %s "
                     % e.message
                 )
                 return
 
             if 'active_server' not in data or 'port' not in data \
                     or 'slaves_list' not in data or 'slaves_memory' not in data:
-                self.show_error("LoadError: Failed to Load Config Error "
-                                "\nSave Your Config File it will be overwritten")
+                self.show_error("LoadError: Failed to Load State : JSON Key "
+                                "Missing")
                 return
 
             slaves_list = data['slaves_list']
@@ -942,7 +941,7 @@ setting_panel = """
     "title": "Load State",
     "desc": "Whether the previous state should be loaded or not, if not the original state is loaded",
     "section": "State",
-    "key": "Load State"
+    "key": "load state"
   }
 
 ]
@@ -969,17 +968,14 @@ class ModbusSimuApp(App):
         return True
 
     def on_stop(self):
-        # will write to the default App config file modbussimu.ini
-        self.config.write()
-        if self.gui.server_running:
-            self.gui._stop_server()
-        self.gui.save_state()
         if self.gui.server_running:
             if self.gui.simulating:
                 self.gui.simulating = False
                 self.gui._simulate()
             self.gui.modbus_device.stop()
         self.gui.sync_modbus_thread.cancel()
+        self.config.write()
+        self.gui.save_state()
 
     def show_settings(self, btn):
         self.open_settings()
@@ -1019,7 +1015,7 @@ class ModbusSimuApp(App):
         config.set('Simulation', 'time interval', 1)
 
         config.add_section('State')
-        config.set('State', 'Load State', 1)
+        config.set('State', 'load state', 1)
 
     def build_settings(self, settings):
         settings.register_type("numeric_range", SettingIntegerWithRange)
