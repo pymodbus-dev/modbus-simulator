@@ -680,14 +680,14 @@ class Gui(BoxLayout):
                 data = load(f)
             except ValueError as e:
                 self.show_error(
-                    "LoadError: Failed to Load State : %s "
+                    "LoadError: Failed to load previous simulation state : %s "
                     % e.message
                 )
                 return
 
             if 'active_server' not in data or 'port' not in data \
                     or 'slaves_list' not in data or 'slaves_memory' not in data:
-                self.show_error("LoadError: Failed to Load State : JSON Key "
+                self.show_error("LoadError: Failed to load previous simulation state : JSON Key "
                                 "Missing")
                 return
 
