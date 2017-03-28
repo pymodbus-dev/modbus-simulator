@@ -17,6 +17,7 @@ from ui.settings import SettingIntegerWithRange
 from utils.backgroundJob import BackgroundJob
 import re
 import os
+from json import load, dump
 from kivy.config import Config
 from kivy.lang import Builder
 import ui.datamodel
@@ -27,6 +28,8 @@ MAP = {
     'input registers': 'input_registers',
     'holding registers': 'holding_registers'
 }
+
+SLAVES_FILE = 'slaves.json'
 
 Builder.load_file("templates/modbussimu.kv")
 
@@ -52,6 +55,9 @@ class Gui(BoxLayout):
     # ---------------------GUI------------------------ #
     # Checkbox to select between tcp/serial
     interfaces = ObjectProperty()
+
+    tcp = ObjectProperty()
+    serial = ObjectProperty()
 
     # Boxlayout to hold interface settings
     interface_settings = ObjectProperty()
@@ -84,6 +90,8 @@ class Gui(BoxLayout):
     data_model_discrete_inputs = ObjectProperty()
     data_model_input_registers = ObjectProperty()
     data_model_holding_registers = ObjectProperty()
+
+    reset_sim_btn = ObjectProperty()
 
     # Helpers
     # slaves = ["%s" %i for i in xrange(1, 248)]
@@ -282,35 +290,41 @@ class Gui(BoxLayout):
 
     def start_server(self, btn):
         if btn.state == "down":
-            self._create_modbus_device()
-
-            self.modbus_device.start()
-            self.server_running = True
-            self.interface_settings.disabled = True
-            self.interfaces.disabled = True
-            self.slave_pane.disabled = False
-            if len(self.slave_list.adapter.selection):
-                self.data_model_loc.disabled = False
-                if self.simulating:
-                    self._simulate()
-
+            self._start_server()
             btn.text = "Stop"
-
         else:
-            self.simulating = False
-            self._simulate()
-            self.modbus_device.stop()
-            self.server_running = False
-            self.interface_settings.disabled = False
-            self.interfaces.disabled = False
-            self.slave_pane.disabled = True
-            self.data_model_loc.disabled = True
+            self._stop_server()
             btn.text = "Start"
+
+    def _start_server(self):
+        self._create_modbus_device()
+
+        self.modbus_device.start()
+        self.server_running = True
+        self.interface_settings.disabled = True
+        self.interfaces.disabled = True
+        self.slave_pane.disabled = False
+        if len(self.slave_list.adapter.selection):
+            self.data_model_loc.disabled = False
+            if self.simulating:
+                self._simulate()
+
+    def _stop_server(self):
+        self.simulating = False
+        self._simulate()
+        self.modbus_device.stop()
+        self.server_running = False
+        self.interface_settings.disabled = False
+        self.interfaces.disabled = False
+        self.slave_pane.disabled = True
+        self.data_model_loc.disabled = True
 
     def update_tcp_connection_info(self, checkbox, value):
         self.active_server = "tcp"
         if value:
             self.interface_settings.current = checkbox
+            if self.last_active_port['tcp'] == "":
+                self.last_active_port['tcp'] = 5440
             self.port.text = self.last_active_port['tcp']
             self._restore()
         else:
@@ -325,7 +339,6 @@ class Gui(BoxLayout):
                 self.last_active_port['serial'] = '/dev/ptyp0'
             self.port.text = self.last_active_port['serial']
             self._restore()
-
         else:
             self.last_active_port['serial'] = self.port.text
             self._backup()
@@ -341,10 +354,14 @@ class Gui(BoxLayout):
         selected = self.slave_list.adapter.selection
         data = self.slave_list.adapter.data
         ret = self._process_slave_data(data)
+        self._add_slaves(selected, data, ret)
+
+    def _add_slaves(self, selected, data, ret):
         if ret[0]:
             start_slave_add, slave_count = ret[1:]
         else:
             return
+
         for slave_to_add in xrange(start_slave_add,
                                    start_slave_add + slave_count):
             if str(slave_to_add) in self.data_map:
@@ -378,7 +395,7 @@ class Gui(BoxLayout):
             self.modbus_device.add_slave(slave_to_add)
             for block_name, block_type in BLOCK_TYPES.items():
                 self.modbus_device.add_block(slave_to_add,
-                    block_name, block_type, self.block_start, self.block_size)
+                                             block_name, block_type, self.block_start, self.block_size)
 
             data.append(str(slave_to_add))
         self.slave_list.adapter.data = data
@@ -452,25 +469,32 @@ class Gui(BoxLayout):
             self.data_map.pop(slave)
 
     def update_data_models(self, *args):
-        ct = self.data_models.current_tab
+        active = self.active_slave
+        tab = self.data_models.current_tab
+        count = self.data_count.text
+        self._update_data_models(active, tab, count, 1)
+
+    def _update_data_models(self, active, tab, count, value):
+        ct = tab
         current_tab = MAP[ct.text]
 
         ct.content.update_view()
         # self.data_map[self.active_slave][current_tab]['dirty'] = False
-        _data = self.data_map[self.active_slave][current_tab]
+        _data = self.data_map[active][current_tab]
         item_strings = _data['item_strings']
-        for i in xrange(int(self.data_count.text)):
+        for i in xrange(int(count)):
             if len(item_strings) < self.block_size:
-                updated_data, item_strings = ct.content.add_data(1, item_strings)
+                _value = 1 if isinstance(value, int) else value[i]
+                updated_data, item_strings = ct.content.add_data(_value, item_strings)
                 _data['data'].update(updated_data)
                 _data['item_strings'] = item_strings
                 for k, v in updated_data.iteritems():
-                    self.modbus_device.set_values(int(self.active_slave),
+                    self.modbus_device.set_values(int(active),
                                                   current_tab, k, v)
             else:
                 msg = ("OutOfModbusBlockError: address %s"
-                       " is out of block size %s" %(len(item_strings),
-                                                    self.block_size))
+                       " is out of block size %s" % (len(item_strings),
+                                                     self.block_size))
                 self.show_error(msg)
                 break
 
@@ -562,8 +586,10 @@ class Gui(BoxLayout):
     def start_stop_simulation(self, btn):
         if btn.state == "down":
             self.simulating = True
+            self.reset_sim_btn.disabled = True
         else:
             self.simulating = False
+            self.reset_sim_btn.disabled = False
             if self.restart_simu:
                 self.restart_simu = False
         self._simulate()
@@ -574,6 +600,13 @@ class Gui(BoxLayout):
         self.data_model_input_registers.start_stop_simulation(self.simulating)
         self.data_model_holding_registers.start_stop_simulation(
             self.simulating)
+
+    def reset_simulation(self, *args):
+        if not self.simulating:
+            self.data_model_coil.reset_block_values()
+            self.data_model_discrete_inputs.reset_block_values()
+            self.data_model_input_registers.reset_block_values()
+            self.data_model_holding_registers.reset_block_values()
 
     def _sync_modbus_block_values(self):
         """
@@ -622,6 +655,90 @@ class Gui(BoxLayout):
          self.slave_end_add.text,
          self.slave_count.text) = self._slave_misc[self.active_server]
         self.slave_list._trigger_reset_populate()
+
+    def save_state(self):
+        with open(SLAVES_FILE, 'w') as f:
+            slave = [int(slave_no) for slave_no in self.slave_list.adapter.data]
+            slaves_memory = []
+            for slaves, mem in self.data_map.iteritems():
+                for name, value in mem.iteritems():
+                    if len(value['data']) != 0:
+                        slaves_memory.append((slaves, name, map(int, value['data'].values())))
+
+            dump(dict(
+                slaves_list=slave, active_server=self.active_server,
+                port=self.port.text, slaves_memory=slaves_memory
+            ), f, indent=4)
+
+    def load_state(self):
+        if not bool(eval(self.config.get("State", "load state"))) or \
+                not os.path.isfile(SLAVES_FILE):
+            return
+
+        with open(SLAVES_FILE, 'r') as f:
+            try:
+                data = load(f)
+            except ValueError as e:
+                self.show_error(
+                    "LoadError: Failed to load previous simulation state : %s "
+                    % e.message
+                )
+                return
+
+            if 'active_server' not in data or 'port' not in data \
+                    or 'slaves_list' not in data or 'slaves_memory' not in data:
+                self.show_error("LoadError: Failed to load previous simulation state : JSON Key "
+                                "Missing")
+                return
+
+            slaves_list = data['slaves_list']
+            if not len(slaves_list):
+                return
+
+            if data['active_server'] == 'tcp':
+                self.tcp.active = True
+                self.serial.active = False
+                self.interface_settings.current = self.tcp
+            else:
+                self.tcp.active = False
+                self.serial.active = True
+                self.interface_settings.current = self.serial
+
+            self.active_server = data['active_server']
+            self.port.text = data['port']
+
+            self._create_modbus_device()
+
+            start_slave = 0
+            temp_list = []
+            slave_count = 1
+            for first, second in zip(slaves_list[:-1], slaves_list[1:]):
+                if first+1 == second:
+                    slave_count += 1
+                else:
+                    temp_list.append((slaves_list[start_slave], slave_count))
+                    start_slave += slave_count
+                    slave_count = 1
+            temp_list.append((slaves_list[start_slave], slave_count))
+
+            for start_slave, slave_count in temp_list:
+                self._add_slaves(
+                    self.slave_list.adapter.selection,
+                    self.slave_list.adapter.data,
+                    (True, start_slave, slave_count)
+                )
+
+            memory_map = {
+                'coils': self.data_models.tab_list[3],
+                'discrete_inputs': self.data_models.tab_list[2],
+                'input_registers': self.data_models.tab_list[1],
+                'holding_registers': self.data_models.tab_list[0]
+            }
+            slaves_memory = data['slaves_memory']
+            for slave_memory in slaves_memory:
+                active_slave, memory_type, memory_data = slave_memory
+                self._update_data_models(active_slave, memory_map[memory_type], len(memory_data), memory_data)
+
 
 setting_panel = """
 [
@@ -811,11 +928,21 @@ setting_panel = """
   {
     "type": "numeric",
     "title": "Time interval",
-    "desc": "When simulation is enabled, data is changed for eveery 'n' seconds defined here",
+    "desc": "When simulation is enabled, data is changed for every 'n' seconds defined here",
     "section": "Simulation",
     "key": "time interval"
+  },
+  {
+    "type": "title",
+    "title": "State"
+  },
+  {
+    "type": "bool",
+    "title": "Load State",
+    "desc": "Whether the previous state should be loaded or not, if not the original state is loaded",
+    "section": "State",
+    "key": "load state"
   }
-
 
 ]
 """
@@ -831,10 +958,10 @@ class ModbusSimuApp(App):
     settings_cls = SettingsWithSidebar
 
     def build(self):
-
         self.gui = Gui(
             modbus_log=os.path.join(self.user_data_dir, 'modbus.log')
         )
+        self.gui.load_state()
         return self.gui
 
     def on_pause(self):
@@ -847,6 +974,8 @@ class ModbusSimuApp(App):
                 self.gui._simulate()
             self.gui.modbus_device.stop()
         self.gui.sync_modbus_thread.cancel()
+        self.config.write()
+        self.gui.save_state()
 
     def show_settings(self, btn):
         self.open_settings()
@@ -884,6 +1013,9 @@ class ModbusSimuApp(App):
 
         config.add_section('Simulation')
         config.set('Simulation', 'time interval', 1)
+
+        config.add_section('State')
+        config.set('State', 'load state', 1)
 
     def build_settings(self, settings):
         settings.register_type("numeric_range", SettingIntegerWithRange)

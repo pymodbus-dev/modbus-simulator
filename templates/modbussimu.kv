@@ -23,6 +23,8 @@
     data_models: data_model_screen
     info_label: info_lbl
     interfaces: interfaces
+    tcp: chkbx
+    serial: chkbx2
     port: txtBox
     interface_settings: interface_settings
     orientation: 'vertical'
@@ -39,6 +41,7 @@
     slave_start_add: slave_start_add
     slave_end_add: slave_end_add
     action_bar: action_bar
+    reset_sim_btn: reset_simulation
     BoxLayout:
         padding: '2sp'
         canvas:
@@ -70,7 +73,7 @@
                 Label:
                     text: "Serial"
                 CheckBox:
-                    id: "chkbx2"
+                    id: chkbx2
                     group: "interface"
                     on_active: root.update_serial_connection_info(*args)
         Widget:
@@ -292,6 +295,10 @@
                 app_icon: 'assets/riptideLogo.png'
                 disabled: True
             ActionOverflow:
+            ActionButton:
+                id: reset_simulation
+                text: 'Reset Simulation'
+                on_release: root.reset_simulation(*args)
             ActionToggleButton:
                 text: 'Simulate'
                 on_release: root.start_stop_simulation(*args)
