@@ -63,3 +63,6 @@ target/
 
 #IniFiles
 *.ini
+
+#JSONFiles
+*.json
