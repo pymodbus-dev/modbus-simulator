@@ -27,7 +27,7 @@ setup(
     scripts=['modbus_simulator/tools/modbus_simu.py'],
     entry_points={
         'console_scripts': [
-            'modbus_simu = modbus_simulator.main:run',
+            'modbus.simu = modbus_simulator.main:run',
         ],
     },
     include_package_data=True
