@@ -24,7 +24,6 @@ setup(
     author="riptideio",
     packages=find_packages(),
     install_requires=install_requires(),
-    scripts=['modbus_simulator/tools/modbus_simu.py'],
     entry_points={
         'console_scripts': [
             'modbus.simu = modbus_simulator.main:run',
