@@ -12,15 +12,18 @@ from kivy.uix.textinput import TextInput
 from kivy.uix.settings import SettingsWithSidebar
 from kivy.uix.listview import ListView, ListItemButton
 from kivy.adapters.listadapter import ListAdapter
-from utils.modbus import ModbusSimu, BLOCK_TYPES, configure_modbus_logger
-from ui.settings import SettingIntegerWithRange
-from utils.backgroundJob import BackgroundJob
+from modbus_simulator.utils.modbus import ModbusSimu, BLOCK_TYPES, \
+    configure_modbus_logger
+from modbus_simulator.ui.settings import SettingIntegerWithRange
+from modbus_simulator.utils.backgroundJob import BackgroundJob
 import re
 import os
 from json import load, dump
 from kivy.config import Config
 from kivy.lang import Builder
-import ui.datamodel
+import modbus_simulator.ui.datamodel
+from pkg_resources import resource_filename
+
 
 MAP = {
     "coils": "coils",
@@ -29,9 +32,12 @@ MAP = {
     'holding registers': 'holding_registers'
 }
 
-SLAVES_FILE = 'slaves.json'
+settings_icon = resource_filename(__name__, "assets/Control-Panel.png")
+app_icon = resource_filename(__name__, "assets/riptideLogo.png")
+modbus_template = resource_filename(__name__, "templates/modbussimu.kv")
+Builder.load_file(modbus_template)
 
-Builder.load_file("templates/modbussimu.kv")
+SLAVES_FILE = resource_filename(__name__, "slaves.json")
 
 
 class FloatInput(TextInput):
@@ -91,6 +97,9 @@ class Gui(BoxLayout):
     data_model_input_registers = ObjectProperty()
     data_model_holding_registers = ObjectProperty()
 
+    settings = ObjectProperty()
+    riptide_logo = ObjectProperty()
+
     reset_sim_btn = ObjectProperty()
 
     # Helpers
@@ -114,6 +123,8 @@ class Gui(BoxLayout):
     def __init__(self, **kwargs):
         super(Gui, self).__init__(**kwargs)
         time_interval = kwargs.get("time_interval", 1)
+        self.settings.icon = settings_icon
+        self.riptide_logo.app_icon = app_icon
         self.config = Config.get_configparser('app')
         self.slave_list.adapter.bind(on_selection_change=self.select_slave)
         self.data_model_loc.disabled = True
@@ -1042,5 +1053,9 @@ class ModbusSimuApp(App):
         super(ModbusSimuApp, self).close_settings()
 
 
-if __name__ == "__main__":
+def run():
     ModbusSimuApp().run()
+
+
+if __name__ == "__main__":
+    run()

@@ -1,5 +1,8 @@
 #!/bin/bash
 
-root_dir="$(cd $(dirname $0)/..; pwd)"
-launch_cmd="$root_dir/main.py"
+echo $0
+root_dir="$(cd $(dirname $0)/../; pwd)"
+simu_dir="$root_dir/modbus_simulator"
+export PYTHONPATH=$root_dir
+launch_cmd="$simu_dir/main.py"
 python $launch_cmd

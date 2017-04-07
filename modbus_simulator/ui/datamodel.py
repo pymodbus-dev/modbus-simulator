@@ -13,9 +13,11 @@ from kivy.uix.listview import ListItemButton, CompositeListItem, ListView, Selec
 from kivy.uix.popup import Popup
 from kivy.uix.textinput import TextInput
 
-from utils.backgroundJob import BackgroundJob
+from modbus_simulator.utils.backgroundJob import BackgroundJob
+from pkg_resources import resource_filename
 
-Builder.load_file("templates/datamodel.kv")
+datamodel_template = resource_filename(__name__, "../templates/datamodel.kv")
+Builder.load_file(datamodel_template)
 
 integers_dict = {}
 
