@@ -26,7 +26,14 @@ Modbus Simulator with GUI based on modbus-tk
 
 ## Running/Testing application
     $ ./tools/launcher
-    
+
+    or
+
+    With Pip
+
+    $ pip install modbus_simulator --extra-index-url http://pip.riptidieo.com/simple --trusted-host pip.riptideio.com
+    $ modubus.simu
+    `
 A GUi should show up if all the requirements are met !!
 
 ![Screen Shot 2015-11-01 at 7.25.50 PM.png](https://bitbucket.org/repo/X9byrq/images/4179375251-Screen%20Shot%202015-11-01%20at%207.25.50%20PM.png)
