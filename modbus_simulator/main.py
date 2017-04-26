@@ -299,6 +299,8 @@ class Gui(BoxLayout):
                 self.slave = ListView(adapter=adapter)
 
             self._serial_settings_changed = False
+        elif self.active_server == "rtu":
+            self.modbus_device._serial.open()
 
     def start_server(self, btn):
         if btn.state == "down":
