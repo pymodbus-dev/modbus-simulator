@@ -23,6 +23,7 @@ from kivy.config import Config
 from kivy.lang import Builder
 import modbus_simulator.ui.datamodel
 from pkg_resources import resource_filename
+from serial.serialutil import SerialException
 
 
 MAP = {
@@ -298,10 +299,17 @@ class Gui(BoxLayout):
                 self.slave = ListView(adapter=adapter)
 
             self._serial_settings_changed = False
+        elif self.active_server == "rtu":
+            self.modbus_device._serial.open()
 
     def start_server(self, btn):
         if btn.state == "down":
-            self._start_server()
+            try:
+                self._start_server()
+            except SerialException as e:
+                btn.state = "normal"
+                self.show_error("Error in opening Serial port: %s" % e)
+                return
             btn.text = "Stop"
         else:
             self._stop_server()

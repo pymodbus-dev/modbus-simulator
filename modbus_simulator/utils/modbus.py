@@ -51,6 +51,7 @@ class PseudoSerial(object):
         self.ser.port = tty_name
 
         self.serial_conf(**kwargs)
+        self.open()
 
     def serial_conf(self, **kwargs):
         self.ser.baudrate = kwargs.get('baudrate', 9600)
