@@ -283,7 +283,8 @@ class Gui(BoxLayout):
             create_new = True
         else:
             if self.modbus_device.server_type == self.active_server:
-                if int(self.modbus_device.port) != int(self.port.text):
+
+                if str(self.modbus_device.port) != str(self.port.text):
                     create_new = True
                 if self._serial_settings_changed:
                     create_new = True
@@ -306,7 +307,8 @@ class Gui(BoxLayout):
 
             self._serial_settings_changed = False
         elif self.active_server == "rtu":
-            self.modbus_device._serial.open()
+            if not USE_PYMODBUS:
+                self.modbus_device._serial.open()
 
     def start_server(self, btn):
         if btn.state == "down":
@@ -549,8 +551,8 @@ class Gui(BoxLayout):
 
         if deleted:
             self.update_backend(int(self.active_slave), current_tab, data)
-            msg = ("modbus-tk do not support deleting "
-               "individual modbus register/discrete_inputs/coils"
+            msg = ("Deleting "
+               "individual modbus register/discrete_inputs/coils is not supported."
                "The data is removed from GUI and the corresponding value is"
                "updated to '0' in backend . ")
             self.show_error(msg)

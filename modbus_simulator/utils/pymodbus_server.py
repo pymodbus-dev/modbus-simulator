@@ -133,6 +133,7 @@ class ModbusSimu(object):
 
         self.context = ModbusServerContext(single=False)
         self.simulate = kwargs.get('simulate', False)
+        self.dirty = False
         if server == "tcp":
             self._port = int(self._port)
             self._address = kwargs.get("address", "localhost")
@@ -188,7 +189,7 @@ class ModbusSimu(object):
 
     def remove_block(self, slave_id, block_name):
         slave = self.get_slave(slave_id)
-        slave.remove_block(block_name)
+        slave.store[_STORE_MAPPER[block_name]].reset()
 
     def remove_all_blocks(self, slave_id):
         slave = self.get_slave(slave_id)
@@ -209,10 +210,13 @@ class ModbusSimu(object):
         return self.context[slave_id]
 
     def start(self):
+        if self.dirty:
+            self.server_thread = ThreadedModbusServer(self.server)
         self.server_thread.start()
 
     def stop(self):
         self.server_thread.stop()
+        self.dirty = True
         # if self._server_type == 'rtu':
         #     self._serial.close()
         # self._server_add = ()
