@@ -4,12 +4,13 @@ import logging
 
 class BackgroundJob(threading.Thread):
     def __init__(self, name, interval, function):
-        threading.Thread.__init__(self)
+        threading.Thread.__init__(self, name=name)
         self._name = name
-        self._logger = logging.getLogger("modbus_tk")
+        self._logger = logging.getLogger(__name__)
         self.interval = interval
         self.simulate_func = function
         self.stop_timer = threading.Event()
+        self.daemon = True
 
     def run(self):
         self._logger.info("Start %s thread" % self._name)

@@ -205,7 +205,8 @@ class Configuration:
         return vars(self)
 
 
-def configure_modbus_logger(cfg, recycle_logs=True):
+def configure_modbus_logger(cfg, protocol_logger ="modbus_tk",
+                            recycle_logs=True):
     """
     Configure the logger.
 
@@ -213,7 +214,7 @@ def configure_modbus_logger(cfg, recycle_logs=True):
         cfg (Namespace): The PUReST config namespace.
     """
 
-    logger = logging.getLogger("modbus_tk")
+    logger = logging.getLogger(protocol_logger)
     if isinstance(cfg, dict):
         cfg = Configuration(**cfg)
 
