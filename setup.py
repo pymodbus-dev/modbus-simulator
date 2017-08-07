@@ -17,7 +17,7 @@ def readme():
 setup(
     name="modbus_simulator",
     url="https://bitbucket.org/riptideio/modbus-simulator",
-    version="0.1",
+    version="1.0",
     description="Modbus Simulator using modbus_tk and kivy",
     long_description=readme(),
     keywords="Modbus Simulator",
