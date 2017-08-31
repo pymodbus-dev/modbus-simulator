@@ -4,5 +4,5 @@ echo $0
 root_dir="$(cd $(dirname $0)/../; pwd)"
 simu_dir="$root_dir/modbus_simulator"
 export PYTHONPATH=$root_dir
-launch_cmd="$simu_dir/main.py"
+launch_cmd="$simu_dir/main.py -p"
 python $launch_cmd
