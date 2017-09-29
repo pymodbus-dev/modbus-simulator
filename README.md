@@ -40,7 +40,7 @@ All the settings for various modbus related settings (block size/minimum/maximun
 ![settings_screen.png](img/settings_screen.png)
 
 ## Usage instructions
-[![Demo Modbus Simulator](img/simu.dif)](https://youtu.be/nlu3S5jdEn4)
+[![Demo Modbus Simulator](/img/simu.gif)](https://youtu.be/nlu3S5jdEn4)
 
 ## Packaging for different OS (Standalone applications)
 A standalone application specific to target OS can be created with Kivy package manager
