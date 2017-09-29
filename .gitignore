@@ -69,3 +69,5 @@ target/
 **/*.ini
 instructions
 read
+.vscode/
+
