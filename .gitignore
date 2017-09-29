@@ -1,6 +1,7 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
+*$py.class
 
 # C extensions
 *.so
@@ -42,6 +43,7 @@ htmlcov/
 nosetests.xml
 coverage.xml
 *,cover
+.hypothesis/
 
 # Translations
 *.mo
@@ -54,6 +56,16 @@ coverage.xml
 docs/_build/
 
 # PyBuilder
-
 target/
 
+#PyCharms
+.idea
+
+#IniFiles
+*.ini
+
+#JSONFiles
+*.json
+**/*.ini
+instructions
+read

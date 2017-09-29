@@ -1,0 +1,14 @@
+#!/bin/bash
+
+echo $0
+if [[ $1 == "mtk" ]]
+then
+    BACKEND=""
+else
+    BACKEND="-p"
+fi
+root_dir="$(cd $(dirname $0)/../; pwd)"
+simu_dir="$root_dir/modbus_simulator"
+export PYTHONPATH=$root_dir
+launch_cmd="$simu_dir/main.py $BACKEND"
+python $launch_cmd
