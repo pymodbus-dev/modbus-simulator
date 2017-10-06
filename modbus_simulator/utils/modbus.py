@@ -126,7 +126,7 @@ class ModbusSimu(object):
         slave = self.server.get_slave(slave_id)
         slave.set_values(block_name, address, values)
 
-    def get_values(self, slave_id, block_name, address, size):
+    def get_values(self, slave_id, block_name, address, size=1):
         slave = self.server.get_slave(slave_id)
         return slave.get_values(block_name, address, size)
 

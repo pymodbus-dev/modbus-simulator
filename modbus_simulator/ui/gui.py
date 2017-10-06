@@ -651,7 +651,7 @@ class Gui(BoxLayout):
                             int(self.active_slave),
                             block_name,
                             int(k),
-                            self.block_size
+
                         )
                         try:
                             if actual_data[0] != int(v):

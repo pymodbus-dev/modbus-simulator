@@ -197,7 +197,7 @@ class ModbusSimu(object):
         if slave.validate(_FX_MAPPER[block_name], address, count=len(values)):
             slave.setValues(_FX_MAPPER[block_name], address, values)
 
-    def get_values(self, slave_id, block_name, address, size):
+    def get_values(self, slave_id, block_name, address, size=1):
         slave = self.get_slave(slave_id)
         if slave.validate(_FX_MAPPER[block_name], address, count=size):
             return slave.getValues(_FX_MAPPER[block_name], address, size)
