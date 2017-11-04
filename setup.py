@@ -1,4 +1,5 @@
 from setuptools import setup, find_packages
+from modbus_simulator.version import __VERSION__
 
 
 def install_requires():
@@ -17,7 +18,7 @@ def readme():
 setup(
     name="modbus_simulator",
     url="https://bitbucket.org/riptideio/modbus-simulator",
-    version="1.0",
+    version=__VERSION__,
     description="Modbus Simulator using modbus_tk and kivy",
     long_description=readme(),
     keywords="Modbus Simulator",
