@@ -1,5 +1,9 @@
 from setuptools import setup, find_packages
+
 from modbus_simulator.version import __VERSION__
+
+from setuptools.command.install import install
+import sys
 
 
 def install_requires():
@@ -14,7 +18,6 @@ def readme():
     with open("README.md") as f:
         return f.read()
 
-
 setup(
     name="modbus_simulator",
     url="https://bitbucket.org/riptideio/modbus-simulator",
@@ -27,7 +30,7 @@ setup(
     install_requires=install_requires(),
     entry_points={
         'console_scripts': [
-            'modbus.simu = modbus_simulator.main:run',
+            'modbus.simu = modbus_simulator.main:_run',
         ],
     },
     include_package_data=True

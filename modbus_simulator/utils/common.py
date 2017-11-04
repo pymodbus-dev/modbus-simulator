@@ -8,15 +8,8 @@ import shutil
 
 def path(name=""):
     """
-    Retrieve the relative filepath to a supplied name from the BrightEdge
-    root directory. If the name begins with a "/", then consider the supplied
-    name to be an absolute path.
+    Retrieve the relative filepath to a supplied name 
 
-    Example:
-    If BrightEdge Root is: /home/vagrant/brightedge
-    path() will return "/home/vagrant/brightedge"
-    path("tools/analyze") will return "/home/vagrant/brightedge/tools/analyze"
-    path("/usr/bin/python") will return "/usr/bin/python"
     """
     if name.startswith(os.path.sep):
         return name
@@ -105,47 +98,3 @@ def remove_dir(name):
     """
     if os.path.exists(name):
         shutil.rmtree(name)
-
-
-def json_dump(contents, name=None, indent=4, as_list=False, default=repr):
-    repr_data = []
-    if name is not None:
-        repr_data = [name]
-    try:
-        json_data = json.dumps(
-            contents, sort_keys=True, indent=indent, default=default
-        ).split("\n")
-        repr_data.extend(json_data)
-    except Exception:
-        repr_data.append(contents)
-    if as_list is True:
-        return repr_data
-    else:
-        for line in repr_data:
-            print line
-
-
-class ValueStore(object):
-
-    def to_json(self, sort_keys=True, indent=4, default=repr, **kwargs):
-        return json.dumps(
-            self.to_dict(),
-            sort_keys=sort_keys,
-            indent=indent,
-            default=default,
-            **kwargs
-        )
-
-    def to_dict(self):
-        return self.__dict__.copy()
-
-    def clone(self):
-        return self.__class__(**self.to_dict())
-
-    def pprint(self):
-        print self.to_json()
-
-    def __repr__(self):
-        items = self.__dict__.items()
-        elems = ["%s=%s" % (k, v) for k, v in items if v is not None]
-        return "%s(%s)" % (self.__class__.__name__, ", ".join(elems))
