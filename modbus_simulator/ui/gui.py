@@ -17,14 +17,24 @@ from modbus_simulator.ui.settings import SettingIntegerWithRange
 from modbus_simulator.utils.backgroundJob import BackgroundJob
 import re
 import os
-import click
+import platform
 
 from json import load, dump
 from kivy.config import Config
 from kivy.lang import Builder
-import modbus_simulator.ui.datamodel
+import modbus_simulator.ui.datamodel  #noqa
 from pkg_resources import resource_filename
 from serial.serialutil import SerialException
+
+IS_DARWIN = platform.system().lower() == "darwin"
+OSX_SIERRA = 10.12
+if IS_DARWIN:
+    MAC_VERSION = float(platform.mac_ver()[0])
+else:
+    MAC_VERSION = 0
+
+DEFAULT_SERIAL_PORT = '/dev/ptyp0' if MAC_VERSION <= OSX_SIERRA else '/dev/ttyp0'
+
 if USE_PYMODBUS:
     from modbus_simulator.utils.pymodbus_server import ModbusSimu
 else:
@@ -363,7 +373,7 @@ class Gui(BoxLayout):
         if value:
             self.interface_settings.current = checkbox
             if self.last_active_port['serial'] == "":
-                self.last_active_port['serial'] = '/dev/ptyp0'
+                self.last_active_port['serial'] = DEFAULT_SERIAL_PORT
             self.port.text = self.last_active_port['serial']
             self._restore()
         else:
