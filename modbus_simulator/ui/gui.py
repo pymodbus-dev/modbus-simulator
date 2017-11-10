@@ -26,14 +26,16 @@ import modbus_simulator.ui.datamodel  #noqa
 from pkg_resources import resource_filename
 from serial.serialutil import SerialException
 
-IS_DARWIN = platform.system().lower() == "darwin"
-OSX_SIERRA = 10.12
-if IS_DARWIN:
-    MAC_VERSION = float(platform.mac_ver()[0])
-else:
-    MAC_VERSION = 0
+from distutils.version import LooseVersion
 
-DEFAULT_SERIAL_PORT = '/dev/ptyp0' if MAC_VERSION <= OSX_SIERRA else '/dev/ttyp0'
+IS_DARWIN = platform.system().lower() == "darwin"
+OSX_SIERRA = LooseVersion("10.12")
+if IS_DARWIN:
+    IS_HIGH_SIERRA_OR_ABOVE = LooseVersion(platform.mac_ver()[0])
+else:
+    IS_HIGH_SIERRA_OR_ABOVE = False
+
+DEFAULT_SERIAL_PORT = '/dev/ptyp0' if not IS_HIGH_SIERRA_OR_ABOVE else '/dev/ttyp0'
 
 if USE_PYMODBUS:
     from modbus_simulator.utils.pymodbus_server import ModbusSimu
