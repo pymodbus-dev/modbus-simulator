@@ -1,9 +1,14 @@
-'''
+"""'
 Modbus Simu App
 ===============
-'''
+"""
 import kivy
-kivy.require('1.4.2')
+import re
+import os
+import platform
+import six
+import struct
+from copy import deepcopy
 from kivy.app import App
 from kivy.properties import ObjectProperty
 from kivy.uix.boxlayout import BoxLayout
@@ -12,22 +17,22 @@ from kivy.uix.textinput import TextInput
 from kivy.uix.settings import SettingsWithSidebar
 from kivy.uix.listview import ListView, ListItemButton
 from kivy.adapters.listadapter import ListAdapter
+from kivy.config import Config
+from kivy.lang import Builder
+
 from modbus_simulator.utils.constants import BLOCK_TYPES
 from modbus_simulator.utils.common import configure_modbus_logger
 from modbus_simulator.ui.settings import SettingIntegerWithRange
 from modbus_simulator.utils.backgroundJob import BackgroundJob
-import re
-import os
-import platform
-import six
 from json import load, dump
-from kivy.config import Config
-from kivy.lang import Builder
+
 import modbus_simulator.ui.datamodel  #noqa
 from pkg_resources import resource_filename
 from serial.serialutil import SerialException
 
 from distutils.version import LooseVersion
+
+kivy.require('1.4.2')
 
 if six.PY3:
     xrange = range
@@ -574,16 +579,19 @@ class Gui(BoxLayout):
                         int(self.active_slave),
                         current_tab,
                         k,
-                        int(v['value']),
+                        float(v['value']),
                         v['formatter']
                     )
                 else:
                     self.modbus_device.set_values(int(self.active_slave),
-                                                  current_tab, k, int(v['value']))
+                                                  current_tab,
+                                                  k, int(v['value']))
         except KeyError:
             pass
+        except struct.error:
+            self.show_error("Invalid value supplied , Check the formatter!")
 
-    def sync_formatter_callback(self, blockname, data):
+    def sync_formatter_callback(self, blockname, data, old_formatter):
         ct = self.data_models.current_tab
         current_tab = MAP[ct.text]
         if blockname != current_tab:
@@ -592,20 +600,24 @@ class Gui(BoxLayout):
             _data = self.data_map[self.active_slave][current_tab]
             _updated = {}
             for k, v in data.items():
+                old_wc = int(filter(str.isdigit, str(old_formatter)))/16
+                new_wc = int(filter(str.isdigit, v.get('formatter')))/16
                 new_val, count = self.modbus_device.decode(
                     int(self.active_slave), current_tab, k, v['formatter']
                 )
                 data[k]['value'] = new_val
                 _updated['offset'] = k
                 _updated['count'] = count
-                if count == 1:
+                if old_wc > new_wc:
                     missing = self.modbus_device.get_values(
-                        int(self.active_slave), current_tab, k, 4)
+                        int(self.active_slave), current_tab, k, old_wc-new_val)
                     for i, val in enumerate(missing):
                         o = int(k) + i
                         data[o] = {'value': val, 'formatter': 'uint16'}
             _data['data'].update(data)
-            ct.content.update_registers(_data['data'], _updated)
+            _data['data'] = dict(ct.content.update_registers(_data['data'],
+                                                             _updated)
+            )
 
         except KeyError:
             pass
@@ -664,7 +676,7 @@ class Gui(BoxLayout):
                     slave_id,
                     blockname,
                     k,
-                    int(v['value']),
+                    float(v['value']),
                     v['formatter']
                 )
             else:
@@ -679,9 +691,9 @@ class Gui(BoxLayout):
 
     def change_datamodel_settings(self, key, value):
         if "max" in key:
-            data = {"maxval": int(value)}
+            data = {"maxval": float(value)}
         else:
-            data = {"minval": int(value)}
+            data = {"minval": float(value)}
 
         if "bin" in key:
             self.data_model_coil.reinit(**data)
@@ -727,15 +739,24 @@ class Gui(BoxLayout):
                 for block_name, value in _data_map.items():
                     updated = {}
                     for k, v in value['data'].items():
-                        actual_data = self.modbus_device.get_values(
-                            int(self.active_slave),
-                            block_name,
-                            int(k),
+                        if block_name in ['input_registers',
+                                          'holding_registers']:
+                            actual_data, count = self.modbus_device.decode(
+                                int(self.active_slave), block_name, k,
+                                v['formatter']
+                            )
+                        else:
+                            actual_data = self.modbus_device.get_values(
+                                int(self.active_slave),
+                                block_name,
+                                int(k),
 
-                        )
+                            )
+                            actual_data = actual_data[0]
                         try:
-                            if actual_data[0] != int(v):
-                                updated[k] = actual_data[0]
+                            if actual_data != float(v['value']):
+                                v['value'] = actual_data
+                                updated[k] = v
                         except TypeError:
                             pass
                     if updated:

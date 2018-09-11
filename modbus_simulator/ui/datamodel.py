@@ -1,4 +1,4 @@
-from random import randint
+from random import randint, uniform
 from copy import deepcopy
 from kivy.adapters.dictadapter import DictAdapter
 from kivy.event import EventDispatcher
@@ -50,7 +50,7 @@ class DropBut(SelectableView, Button):
         pass
 
     def on_formatter_select(self, instance, value):
-        self.data_model.on_formatter_update(self.index, value)
+        self.data_model.on_formatter_update(self.index, self.text, value)
         self.text = value
 
 
@@ -145,9 +145,9 @@ class NumericTextInput(SelectableView, TextInput):
     def on_text_validate(self, *args):
 
         try:
-            int(self.text)
+            float(self.text)
 
-            if not(self.minval <= int(self.text) <= self.maxval):
+            if not(self.minval <= float(self.text) <= self.maxval):
                 raise ValueError
             self.edit = False
             self.data_model.on_data_update(self.index, self.text)
@@ -184,7 +184,9 @@ class UpdateEventDispatcher(EventDispatcher):
         if event == 'sync_data':
             _parent.sync_data_callback(blockname, data.get('data', {}))
         else:
-            _parent.sync_formatter_callback(blockname, data.get('data', {}))
+            old_formatter = data.pop("old_formatter", None)
+            _parent.sync_formatter_callback(blockname, data.get('data', {}),
+                                            old_formatter)
 
 
 class DataModel(GridLayout):
@@ -408,7 +410,7 @@ class DataModel(GridLayout):
         :param data:
         :return:
         """
-        index = self.get_address(int(index))
+        index = self.get_address(self.list_view.adapter.sorted_keys[index])
         try:
             self.list_view.adapter.data[index]
         except KeyError:
@@ -425,7 +427,7 @@ class DataModel(GridLayout):
                                  self.blockname,
                                  data)
 
-    def on_formatter_update(self, index, data):
+    def on_formatter_update(self, index, old, new):
         """
         Callback function to use the formatter selected in the list view
         Args:
@@ -435,13 +437,15 @@ class DataModel(GridLayout):
         Returns:
 
         """
-        index = self.get_address(int(index))
+        index = self.get_address(self.list_view.adapter.sorted_keys[index])
+        # index = self.get_address(int(index))
         try:
-            self.list_view.adapter.data[index]['formatter'] = data
+            self.list_view.adapter.data[index]['formatter'] = new
         except KeyError:
             index = str(index)
-            self.list_view.adapter.data[index]['formatter'] = data
+            self.list_view.adapter.data[index]['formatter'] = new
         _data = {'event': 'sync_formatter',
+                 'old_formatter': old,
                  'data': {index: self.list_view.adapter.data[index]}}
         self.dispatcher.dispatch('on_update', self._parent,
                                  self.blockname, _data)
@@ -458,7 +462,7 @@ class DataModel(GridLayout):
 
         self.list_view.adapter.update_for_new_data()
         self.refresh(new_values, to_remove)
-        pass
+        return self.list_view.adapter.data
 
     def refresh(self, data={}, to_remove=None):
         """
@@ -506,7 +510,17 @@ class DataModel(GridLayout):
             data = self.list_view.adapter.data
             if data:
                 for index, value in data.items():
-                    value = randint(self.minval, self.maxval)
+                    if self.blockname in ['input_registers',
+                                          'holding_registers']:
+                        if 'float' in data[index]['formatter']:
+                            value = round(uniform(self.minval, self.maxval), 2)
+                        else:
+                            value = randint(self.minval, self.maxval)
+                            if 'uint' in data[index]['formatter']:
+                                value = abs(value)
+                    else:
+                        value = randint(self.minval, self.maxval)
+
                     data[index]['value'] = value
                 self.refresh(data)
                 data = {'event': 'sync_data',

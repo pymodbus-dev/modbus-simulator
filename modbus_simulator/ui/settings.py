@@ -82,12 +82,12 @@ class SettingIntegerWithRange(SettingItem):
             self._dismiss()
             try:
                 value = self.textinput.text.strip()
-                value = text_type(int(value))
+                value = text_type(float(value))
             except ValueError:
                 self.textinput.text = self.value
                 return
             if not self._override:
-                if self.minval <= int(value) <= self.maxval:
+                if self.minval <= float(value) <= self.maxval:
                     self.value = value
                 else:
                     self.value = str(self.default[self.default_key])
