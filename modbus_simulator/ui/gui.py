@@ -12,13 +12,14 @@ from kivy.uix.textinput import TextInput
 from kivy.uix.settings import SettingsWithSidebar
 from kivy.uix.listview import ListView, ListItemButton
 from kivy.adapters.listadapter import ListAdapter
-from modbus_simulator.utils.modbus import BLOCK_TYPES, configure_modbus_logger
+from modbus_simulator.utils.constants import BLOCK_TYPES
+from modbus_simulator.utils.common import configure_modbus_logger
 from modbus_simulator.ui.settings import SettingIntegerWithRange
 from modbus_simulator.utils.backgroundJob import BackgroundJob
 import re
 import os
 import platform
-
+import six
 from json import load, dump
 from kivy.config import Config
 from kivy.lang import Builder
@@ -28,6 +29,9 @@ from serial.serialutil import SerialException
 
 from distutils.version import LooseVersion
 
+if six.PY3:
+    xrange = range
+    
 IS_DARWIN = platform.system().lower() == "darwin"
 OSX_SIERRA = LooseVersion("10.12")
 if IS_DARWIN:
@@ -138,9 +142,9 @@ class Gui(BoxLayout):
     active_server = "tcp"
     _serial_settings_changed = False
 
-    def __init__(self, **kwargs):
+    def __init__(self, time_interval=1, modbus_log=None, **kwargs):
         super(Gui, self).__init__(**kwargs)
-        time_interval = kwargs.get("time_interval", 1)
+        # time_interval = kwargs.get("time_interval", 1)
         self.settings.icon = settings_icon
         self.riptide_logo.app_icon = app_icon
         self.config = Config.get_configparser('app')
@@ -166,7 +170,7 @@ class Gui(BoxLayout):
             'no_modbus_file_log': not bool(eval(
                 self.config.get("Logging", "file logging"))),
 
-            'modbus_log': kwargs['modbus_log']
+            'modbus_log': modbus_log
         }
         mod_lib = "modbus_tk" if not USE_PYMODBUS else "pymodbus"
         configure_modbus_logger(cfg, protocol_logger=mod_lib)
@@ -244,6 +248,9 @@ class Gui(BoxLayout):
                                                     "block start")))
         self.block_size = int(eval(self.config.get("Modbus Protocol",
                                                    "block size")))
+        self.word_order = self.config.get("Modbus Protocol", "word order")
+        self.byte_order = self.config.get("Modbus Protocol", "byte order")
+
         self.data_model_input_registers.init(
             blockname="input_registers",
             simulate=self.simulating,
@@ -270,6 +277,8 @@ class Gui(BoxLayout):
     def _create_modbus_device(self):
         kwargs = {}
         create_new = False
+        kwargs['byte_order'] = self.byte_order
+        kwargs['word_order'] = self.word_order
         if self.active_server == "rtu":
 
             kwargs["baudrate"] = int(eval(
@@ -510,10 +519,18 @@ class Gui(BoxLayout):
     def update_data_models(self, *args):
         active = self.active_slave
         tab = self.data_models.current_tab
-        count = self.data_count.text
-        self._update_data_models(active, tab, count, 1)
+        count = int(self.data_count.text)
+        value = {}
+        for i in xrange(count):
+            _value = {'value': 1}
+            if tab in ['input_registers', 'holding_registers']:
+                _value['formatter'] = 'uint16'
 
-    def _update_data_models(self, active, tab, count, value):
+            value[i] = _value
+
+        self._update_data_models(active, tab, value)
+
+    def _update_data_models(self, active, tab, value):
         ct = tab
         current_tab = MAP[ct.text]
 
@@ -521,21 +538,26 @@ class Gui(BoxLayout):
         # self.data_map[self.active_slave][current_tab]['dirty'] = False
         _data = self.data_map[active][current_tab]
         item_strings = _data['item_strings']
-        for i in xrange(int(count)):
-            if len(item_strings) < self.block_size:
-                _value = 1 if isinstance(value, int) else value[i]
-                updated_data, item_strings = ct.content.add_data(_value, item_strings)
-                _data['data'].update(updated_data)
-                _data['item_strings'] = item_strings
-                for k, v in updated_data.iteritems():
-                    self.modbus_device.set_values(int(active),
-                                                  current_tab, k, v)
-            else:
-                msg = ("OutOfModbusBlockError: address %s"
-                       " is out of block size %s" % (len(item_strings),
-                                                     self.block_size))
-                self.show_error(msg)
-                break
+
+        # Old schema
+        if isinstance(value, list):
+            _new_value = list(value)
+            value = {}
+            for index, v in enumerate(_new_value):
+                if not isinstance(v, dict):
+                    value[index] = {'value': v}
+                if current_tab in ['input_registers', 'holding_registers']:
+                    value[index]['formatter'] = 'uint16'
+        if len(value) < self.block_size:
+            list_data, item_strings = ct.content.add_data(value)
+            _data['item_strings'] = item_strings
+            _data['data'].update(list_data)
+            self.update_backend(int(active), current_tab, value)
+        else:
+            msg = ("OutOfModbusBlockError: address %s"
+                   " is out of block size %s" % (len(item_strings),
+                                                 self.block_size))
+            self.show_error(msg)
 
     def sync_data_callback(self, blockname, data):
         ct = self.data_models.current_tab
@@ -545,9 +567,46 @@ class Gui(BoxLayout):
         try:
             _data = self.data_map[self.active_slave][current_tab]
             _data['data'].update(data)
-            for k, v in data.iteritems():
-                self.modbus_device.set_values(int(self.active_slave),
-                                              current_tab, k, int(v))
+            for k, v in data.items():
+                # v = v if not isinstance(v, dict) else v['value']
+                if blockname in ['holding_registers', 'input_registers']:
+                    self.modbus_device.encode(
+                        int(self.active_slave),
+                        current_tab,
+                        k,
+                        int(v['value']),
+                        v['formatter']
+                    )
+                else:
+                    self.modbus_device.set_values(int(self.active_slave),
+                                                  current_tab, k, int(v['value']))
+        except KeyError:
+            pass
+
+    def sync_formatter_callback(self, blockname, data):
+        ct = self.data_models.current_tab
+        current_tab = MAP[ct.text]
+        if blockname != current_tab:
+            current_tab = blockname
+        try:
+            _data = self.data_map[self.active_slave][current_tab]
+            _updated = {}
+            for k, v in data.items():
+                new_val, count = self.modbus_device.decode(
+                    int(self.active_slave), current_tab, k, v['formatter']
+                )
+                data[k]['value'] = new_val
+                _updated['offset'] = k
+                _updated['count'] = count
+                if count == 1:
+                    missing = self.modbus_device.get_values(
+                        int(self.active_slave), current_tab, k, 4)
+                    for i, val in enumerate(missing):
+                        o = int(k) + i
+                        data[o] = {'value': val, 'formatter': 'uint16'}
+            _data['data'].update(data)
+            ct.content.update_registers(_data['data'], _updated)
+
         except KeyError:
             pass
 
@@ -563,10 +622,9 @@ class Gui(BoxLayout):
 
         if deleted:
             self.update_backend(int(self.active_slave), current_tab, data)
-            msg = ("Deleting "
-               "individual modbus register/discrete_inputs/coils is not supported."
-               "The data is removed from GUI and the corresponding value is"
-               "updated to '0' in backend . ")
+            msg = ("Deleting individual modbus register/discrete_inputs/coils "
+                   "is not supported. The data is removed from GUI and "
+                   "the corresponding value is updated to '0' in backend . ")
             self.show_error(msg)
 
     def select_slave(self, adapter):
@@ -595,13 +653,23 @@ class Gui(BoxLayout):
             dm = self.data_map[self.active_slave][MAP[child.text]]['data']
             child.content.refresh(dm)
 
-    def update_backend(self, slave_id, blockname, new_data, ):
+    def update_backend(self, slave_id, blockname, new_data):
         self.modbus_device.remove_block(slave_id, blockname)
         self.modbus_device.add_block(slave_id, blockname,
                                      BLOCK_TYPES[blockname], 0,
                                      self.block_size)
-        for k, v in new_data.iteritems():
-            self.modbus_device.set_values(slave_id, blockname, k, int(v))
+        for k, v in new_data.items():
+            if blockname in ['holding_registers', 'input_registers']:
+                self.modbus_device.encode(
+                    slave_id,
+                    blockname,
+                    k,
+                    int(v['value']),
+                    v['formatter']
+                )
+            else:
+                self.modbus_device.set_values(slave_id, blockname,
+                                              k, int(v['value']))
 
     def change_simulation_settings(self, **kwargs):
         self.data_model_coil.reinit(**kwargs)
@@ -702,10 +770,12 @@ class Gui(BoxLayout):
         with open(SLAVES_FILE, 'w') as f:
             slave = [int(slave_no) for slave_no in self.slave_list.adapter.data]
             slaves_memory = []
-            for slaves, mem in self.data_map.iteritems():
-                for name, value in mem.iteritems():
+            for slaves, mem in self.data_map.items():
+                for name, value in mem.items():
                     if len(value['data']) != 0:
-                        slaves_memory.append((slaves, name, map(int, value['data'].values())))
+                        slaves_memory.append((slaves, name,
+                                              value['data']
+                                              ))
 
             dump(dict(
                 slaves_list=slave, active_server=self.active_server,
@@ -727,10 +797,12 @@ class Gui(BoxLayout):
                 )
                 return
 
-            if 'active_server' not in data or 'port' not in data \
-                    or 'slaves_list' not in data or 'slaves_memory' not in data:
-                self.show_error("LoadError: Failed to load previous simulation state : JSON Key "
-                                "Missing")
+            if ('active_server' not in data
+                    or 'port' not in data
+                    or 'slaves_list' not in data
+                    or 'slaves_memory' not in data):
+                self.show_error("LoadError: Failed to load previous "
+                                "simulation state : JSON Key Missing")
                 return
 
             slaves_list = data['slaves_list']
@@ -748,7 +820,8 @@ class Gui(BoxLayout):
 
             self.active_server = data['active_server']
             self.port.text = data['port']
-
+            self.word_order = self.config.get("Modbus Protocol", "word order")
+            self.byte_order = self.config.get("Modbus Protocol", "byte order")
             self._create_modbus_device()
 
             start_slave = 0
@@ -779,7 +852,9 @@ class Gui(BoxLayout):
             slaves_memory = data['slaves_memory']
             for slave_memory in slaves_memory:
                 active_slave, memory_type, memory_data = slave_memory
-                self._update_data_models(active_slave, memory_map[memory_type], len(memory_data), memory_data)
+                self._update_data_models(active_slave,
+                                         memory_map[memory_type],
+                                         memory_data)
 
 
 setting_panel = """
@@ -877,6 +952,20 @@ setting_panel = """
     "desc": "Modbus Block Start index",
     "section": "Modbus Protocol",
     "key": "Block Start"
+  },
+  { "type": "options",
+    "title": "Byte Order",
+    "desc": "Modbus Byte Order",
+    "section": "Modbus Protocol",
+    "key": "Byte Order",
+    "options": ["big", "little"]
+  },
+  { "type": "options",
+    "title": "Word Order",
+    "desc": "Modbus Word Order",
+    "section": "Modbus Protocol",
+    "key": "Word Order",
+    "options": ["big", "little"]
   },
   { "type": "numeric",
     "title": "Block Size",
@@ -1029,6 +1118,8 @@ class ModbusSimuApp(App):
         config.set('Modbus Tcp', "ip", '127.0.0.1')
         config.set('Modbus Protocol', "block start", 0)
         config.set('Modbus Protocol', "block size", 100)
+        config.set('Modbus Protocol', "byte order", 'big')
+        config.set('Modbus Protocol', "word order", 'big')
         config.set('Modbus Protocol', "bin min", 0)
         config.set('Modbus Protocol', "bin max", 1)
         config.set('Modbus Protocol', "reg min", 0)
@@ -1062,8 +1153,7 @@ class ModbusSimuApp(App):
     def build_settings(self, settings):
         settings.register_type("numeric_range", SettingIntegerWithRange)
         settings.add_json_panel('Modbus Settings', self.config,
-                                data=setting_panel
-                                )
+                                data=setting_panel)
 
     def on_config_change(self, config, section, key, value):
         if config is not self.config:
@@ -1073,7 +1163,8 @@ class ModbusSimuApp(App):
             self.gui.change_simulation_settings(time_interval=eval(value))
         if section == "Modbus Protocol" and key in ("bin max",
                                            "bin min", "reg max",
-                                           "reg min", "override"):
+                                           "reg min", "override",
+                                                    "word order", "byte order"):
             self.gui.change_datamodel_settings(key, value)
         if section == "Modbus Protocol" and key == "block start":
             self.gui.block_start = int(value)

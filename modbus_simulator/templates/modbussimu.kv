@@ -17,7 +17,7 @@
             size: self.width - 2 * self.margin , self.thickness
 
 
-<DataModal>:
+<DataModel>:
 <FloatInput>:
 <Gui>:
     slave_list: slave_list
@@ -254,11 +254,13 @@
                     id: add_data
                     text: "add"
                     on_release: root.update_data_models(*args)
-                Widget:
-                Button:
-                    id: delete_data
-                    text: "delete"
-                    on_release: root.delete_data_entry(*args)
+#                Widget:
+#                Button:
+#                    id: delete_data
+#                    text: "delete"
+#                    disabled: True
+#                    on_release: root.delete_data_entry(*args)
+#                    hide: True
             Separator:
             TabbedPanel:
                 id: data_model_screen
