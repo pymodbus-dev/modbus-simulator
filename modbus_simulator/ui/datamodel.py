@@ -286,16 +286,17 @@ class DataModel(GridLayout):
             self.add_widget(self.list_view)
             self.dirty_model = False
 
-    def get_address(self, offset):
+    def get_address(self, offset, as_string=False):
         offset = int(offset)
         if self.blockname == "coils":
-            return offset
+            offset = offset
         elif self.blockname == "discrete_inputs":
-            return 10001 + offset if offset < 10001 else offset
+            offset = 10001 + offset if offset < 10001 else offset
         elif self.blockname == "input_registers":
-            return 30001 + offset if offset < 30001 else offset
+            offset = 30001 + offset if offset < 30001 else offset
         else:
-            return 40001 + offset if offset < 40001 else offset
+            offset = 40001 + offset if offset < 40001 else offset
+        return str(offset) if as_string else offset
 
     def arg_converter(self, index, data):
         """
@@ -369,14 +370,17 @@ class DataModel(GridLayout):
         self.update_view()
         current_keys = self.list_view.adapter.sorted_keys
         next_index = 0
+        key_as_string = False
         if current_keys:
             next_index = int(max(current_keys)) + 1
-        data = {self.get_address(int(offset) + next_index): v
+            if not isinstance(current_keys[0], int):
+                key_as_string = True
+        data = {self.get_address(int(offset) + next_index, key_as_string): v
                 for offset, v in data.items()}
         for offset, d in data.items():
             # offset = self.get_address(offset)
             item_strings.append(offset)
-            if offset >= 30001:
+            if int(offset) >= 30001:
                 if not d.get('formatter'):
                     d['formatter'] = 'uint16'
 
@@ -473,7 +477,10 @@ class DataModel(GridLayout):
         :return:
         """
         self.update_view()
-        self.list_view.adapter.data.update(data)
+        if not data or len(data) != len(self.list_view.adapter.data):
+            self.list_view.adapter.data = data
+        else:
+            self.list_view.adapter.data.update(data)
         if to_remove:
             for entry in to_remove:
                 removed = self.list_view.adapter.data.pop(entry, None)

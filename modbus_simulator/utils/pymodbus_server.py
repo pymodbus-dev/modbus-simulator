@@ -177,7 +177,7 @@ class ModbusSimu(object):
         self.identity.VendorUrl = 'http://github.com/riptideio/'
         self.identity.ProductName = 'Modbus Server'
         self.identity.ModelName = 'Modbus Server'
-        self.identity.MajorMinorRevision = '1.0.0'
+        self.identity.MajorMinorRevision = '2.0.0'
 
     @property
     def server_type(self):

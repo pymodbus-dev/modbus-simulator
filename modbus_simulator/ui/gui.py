@@ -448,7 +448,9 @@ class Gui(BoxLayout):
             self.modbus_device.add_slave(slave_to_add)
             for block_name, block_type in BLOCK_TYPES.items():
                 self.modbus_device.add_block(slave_to_add,
-                                             block_name, block_type, self.block_start, self.block_size)
+                                             block_name, block_type,
+                                             self.block_start,
+                                             self.block_size)
 
             data.append(str(slave_to_add))
         self.slave_list.adapter.data = data
@@ -540,9 +542,13 @@ class Gui(BoxLayout):
         current_tab = MAP[ct.text]
 
         ct.content.update_view()
-        # self.data_map[self.active_slave][current_tab]['dirty'] = False
         _data = self.data_map[active][current_tab]
-        item_strings = _data['item_strings']
+        registers = sum(
+            map(
+                lambda val: int(
+                    filter(
+                        str.isdigit, str(val.get('formatter', '16')))
+                ), _data['data'].values()))/16
 
         # Old schema
         if isinstance(value, list):
@@ -553,14 +559,15 @@ class Gui(BoxLayout):
                     value[index] = {'value': v}
                 if current_tab in ['input_registers', 'holding_registers']:
                     value[index]['formatter'] = 'uint16'
-        if len(value) < self.block_size:
+        if registers+len(value) <= self.block_size:
             list_data, item_strings = ct.content.add_data(value)
-            _data['item_strings'] = item_strings
+            _data['item_strings'].extend(item_strings)
+            _data['item_strings'] = list(set(_data['item_strings']))
             _data['data'].update(list_data)
-            self.update_backend(int(active), current_tab, value)
+            self.update_backend(int(active), current_tab, list_data)
         else:
             msg = ("OutOfModbusBlockError: address %s"
-                   " is out of block size %s" % (len(item_strings),
+                   " is out of block size %s" % (len(value),
                                                  self.block_size))
             self.show_error(msg)
 
@@ -610,9 +617,14 @@ class Gui(BoxLayout):
                 _updated['count'] = count
                 if old_wc > new_wc:
                     missing = self.modbus_device.get_values(
-                        int(self.active_slave), current_tab, k, old_wc-new_val)
+                        int(self.active_slave),
+                        current_tab, int(k) + new_wc,
+                        old_wc-new_wc
+                    )
                     for i, val in enumerate(missing):
-                        o = int(k) + i
+                        o = int(k) + new_wc + i
+                        if not isinstance(k, int):
+                            o = str(o)
                         data[o] = {'value': val, 'formatter': 'uint16'}
             _data['data'].update(data)
             _data['data'] = dict(ct.content.update_registers(_data['data'],
@@ -873,9 +885,13 @@ class Gui(BoxLayout):
             slaves_memory = data['slaves_memory']
             for slave_memory in slaves_memory:
                 active_slave, memory_type, memory_data = slave_memory
-                self._update_data_models(active_slave,
-                                         memory_map[memory_type],
-                                         memory_data)
+                _data = self.data_map[active_slave][memory_type]
+                _data['data'].update(memory_data)
+                _data['item_strings'] = list(sorted(memory_data.keys()))
+                self.update_backend(int(active_slave), memory_type, memory_data)
+                # self._update_data_models(active_slave,
+                #                          memory_map[memory_type],
+                #                          memory_data)
 
 
 setting_panel = """
