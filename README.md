@@ -16,7 +16,7 @@ Modbus Simulator with GUI based on modbus-tk
     $ pip install -r requirements
     $ # Choose Modbus Backend modbus_tk or pymodbus (default)
     $ # To install pymodbus
-    $ pip install pymodbus==1.3.2
+    $ pip install pymodbus==1.5.2
     $ # To install modbus tk
     $ Pip install modbus-tk
 
