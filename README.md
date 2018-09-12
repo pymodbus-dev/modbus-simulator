@@ -1,6 +1,6 @@
 # Modbus Simulator
 
-Modbus Simulator with GUI based on modbus-tk
+Modbus Simulator with GUI based on modbus-tk and Pymodbus
 
 ## Checking Out the Source
     $ git clone https://github.com/riptideio/modbus-simulator.git
