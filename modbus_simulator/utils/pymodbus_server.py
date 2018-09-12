@@ -8,6 +8,7 @@ from pymodbus.datastore import ModbusSequentialDataBlock
 from pymodbus.datastore import ModbusSlaveContext, ModbusServerContext
 
 from pymodbus.transaction import ModbusRtuFramer
+from pymodbus.payload import BinaryPayloadDecoder, Endian, BinaryPayloadBuilder
 
 from threading import Thread, RLock
 import logging
@@ -31,6 +32,30 @@ _STORE_MAPPER = {
     'discrete_inputs': 'd',
     'input_registers': 'i',
     'holding_registers': 'h'
+}
+
+DECODERS = {
+    'int16': "decode_16bit_int",
+    'int32': "decode_32bit_int",
+    'int64': "decode_64bit_int",
+    'uint16': "decode_16bit_uint",
+    'uint32': "decode_32bit_uint",
+    'uint64': "decode_64bit_uint",
+    'float32': "decode_32bit_float",
+    'float64': "decode_64bit_float",
+
+}
+
+ENCODERS = {
+    'int16': "add_16bit_int",
+    'int32': "add_32bit_int",
+    'int64': "add_64bit_int",
+    'uint16': "add_16bit_uint",
+    'uint32': "add_32bit_uint",
+    'uint64': "add_64bit_uint",
+    'float32': "add_32bit_float",
+    'float64': "add_64bit_float",
+
 }
 
 
@@ -129,6 +154,10 @@ class ModbusSimu(object):
 
         self.context = ModbusServerContext(single=False)
         self.simulate = kwargs.get('simulate', False)
+        byte_order = kwargs.pop("byte_order", "big")
+        word_order = kwargs.pop("word_order", "big")
+        self.byte_order = Endian.Big if byte_order == "big" else Endian.Little
+        self.word_order = Endian.Big if word_order == "big" else Endian.Little
         self.dirty = False
         if server == "tcp":
             self._port = int(self._port)
@@ -138,8 +167,8 @@ class ModbusSimu(object):
                                           address=(self._address, self._port))
         else:
             self.server = MbusSerialServer(self.context,
-                                             framer=ModbusRtuFramer,
-                                             identity=self.identity, **kwargs)
+                                           framer=ModbusRtuFramer,
+                                           identity=self.identity, **kwargs)
         self.server_thread = ThreadedModbusServer(self.server)
 
     def _add_device_info(self):
@@ -148,7 +177,7 @@ class ModbusSimu(object):
         self.identity.VendorUrl = 'http://github.com/riptideio/'
         self.identity.ProductName = 'Modbus Server'
         self.identity.ModelName = 'Modbus Server'
-        self.identity.MajorMinorRevision = '1.0.0'
+        self.identity.MajorMinorRevision = '2.0.0'
 
     @property
     def server_type(self):
@@ -166,6 +195,18 @@ class ModbusSimu(object):
             ir=CustomDataBlock(0, 0),
 
         )
+
+    @staticmethod
+    def _calc_offset(block_name, address):
+        address = int(address)
+        if block_name == "coils":
+            return address
+        elif block_name == "discrete_inputs":
+            return address-10001 if address >= 10001 else address
+        elif block_name == "input_registers":
+            return address - 30001 if address >= 30001 else address
+        else:
+            return address - 40001 if address >= 40001 else address
 
     def add_slave(self, slave_id):
         self.context[slave_id] = self._add_default_slave_context()
@@ -194,16 +235,39 @@ class ModbusSimu(object):
     def set_values(self, slave_id, block_name, address, values):
         values = values if isinstance(values, (list, tuple)) else [values]
         slave = self.get_slave(slave_id)
+        address = self._calc_offset(block_name, address)
         if slave.validate(_FX_MAPPER[block_name], address, count=len(values)):
             slave.setValues(_FX_MAPPER[block_name], address, values)
 
     def get_values(self, slave_id, block_name, address, size=1):
         slave = self.get_slave(slave_id)
+        address = self._calc_offset(block_name, address)
         if slave.validate(_FX_MAPPER[block_name], address, count=size):
             return slave.getValues(_FX_MAPPER[block_name], address, size)
 
     def get_slave(self, slave_id):
         return self.context[slave_id]
+
+    def decode(self, slave_id, block_name, offset, formatter):
+        count = 1
+        if '32' in formatter:
+            count = 2
+        elif '64' in formatter:
+            count = 4
+        values = self.get_values(slave_id, block_name, offset, count)
+        if values:
+            decoder = BinaryPayloadDecoder.fromRegisters(
+                values, byteorder=self.byte_order, wordorder=self.word_order)
+            values = getattr(decoder, DECODERS.get(formatter))()
+            return values, count
+
+    def encode(self, slave_id, block_name, offset, value, formatter):
+        builder = BinaryPayloadBuilder(byteorder=self.byte_order,
+                                       wordorder=self.word_order)
+        add_method = ENCODERS.get(formatter)
+        getattr(builder, add_method)(value)
+        payload = builder.to_registers()
+        return self.set_values(slave_id, block_name, offset, payload)
 
     def start(self):
         if self.dirty:
@@ -221,14 +285,3 @@ class ModbusSimu(object):
         if self.server is not None:
             return self.server._databank._slaves
 
-
-if __name__ == "__main__":
-    s = ModbusSimu(server="rtu", port="/dev/ptyp0")
-    # s = ModbusSimu(address="localhost", port=5020)
-    s.start()
-    s.add_slave(1)
-    s.add_block(1, "holding registers", "holding_registers", 0, 100)
-    s.add_block(1, "coils", "holding_registers", 0, 100)
-    s.set_values(1, "holding registers", 0, [34] * 55)
-    log.info(s.get_values(1, "holding registers", 0, 100))
-    s.stop()

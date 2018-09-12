@@ -51,4 +51,4 @@ A standalone application specific to target OS can be created with Kivy package 
 
 
 # NOTE:
-A cli version supporting both Modbus_RTU and Modbus_TCP is available here [modbus_simu_cli](https://github.com/dhoomakethu/modbus_sim_cli)
+A cli version supporting both Modbus_RTU and Modbus_TCP is available here [modbus_simu_cli](https://bitbucket.org/riptideio/modbus_sim_cli)

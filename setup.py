@@ -1,7 +1,11 @@
 from setuptools import setup, find_packages
+
+from modbus_simulator.version import __VERSION__
+
 from setuptools.command.install import install
 import sys
 from modbus_simulator.version import __VERSION__
+
 
 
 def install_requires():
