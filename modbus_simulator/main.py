@@ -4,7 +4,12 @@ Modbus Simu App
 '''
 import click
 import sys
-import __builtin__
+import six
+
+if six.PY2:
+    import __builtin__
+else:
+    import builtins as __builtin__
 
 
 @click.command()

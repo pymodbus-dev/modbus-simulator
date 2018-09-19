@@ -1,6 +1,6 @@
 # Modbus Simulator
 
-Modbus Simulator with GUI based on modbus-tk
+Modbus Simulator with GUI based on modbus-tk and Pymodbus
 
 ## Checking Out the Source
     $ git clone https://github.com/riptideio/modbus-simulator.git
@@ -16,7 +16,7 @@ Modbus Simulator with GUI based on modbus-tk
     $ pip install -r requirements
     $ # Choose Modbus Backend modbus_tk or pymodbus (default)
     $ # To install pymodbus
-    $ pip install pymodbus==1.3.2
+    $ pip install pymodbus==1.5.2
     $ # To install modbus tk
     $ Pip install modbus-tk
 
@@ -40,7 +40,7 @@ All the settings for various modbus related settings (block size/minimum/maximun
 ![settings_screen.png](img/settings_screen.png)
 
 ## Usage instructions
-[![Demo Modbus Simulator](/img/simu.gif)](https://youtu.be/nlu3S5jdEn4)
+[![Demo Modbus Simulator](/img/simu.gif)](https://www.youtube.com/watch?v=a5-OridSlt8)
 
 ## Packaging for different OS (Standalone applications)
 A standalone application specific to target OS can be created with Kivy package manager

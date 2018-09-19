@@ -4,6 +4,7 @@ import logging
 import os
 
 import serial
+import struct
 from modbus_tk.defines import (
     COILS, DISCRETE_INPUTS, HOLDING_REGISTERS, ANALOG_INPUTS)
 from modbus_tk.modbus_rtu import RtuServer, RtuMaster
@@ -18,7 +19,6 @@ ADDRESS_RANGE = {
     ANALOG_INPUTS: 30001
 
 }
-import struct
 
 REGISTER_QUERY_FIELDS = {"bit": range(0, 16),
                          "byteorder": ["big", "little"],
@@ -188,60 +188,3 @@ def pack_float(words):
     for x in words:
         temp.append(struct.unpack("!f", ("%08x" % x).decode('hex'))[0])
     return temp
-
-
-class Configuration:
-    def __init__(self, no_modbus_log=False, no_modbus_console_log=False,
-                 no_modbus_file_log=True, modbus_console_log_level="DEBUG",
-                 modbus_file_log_level="DEBUG", modbus_log=""):
-        self.no_modbus_log = no_modbus_log
-        self.no_modbus_console_log = no_modbus_console_log
-        self.no_modbus_file_log = no_modbus_file_log
-        self.modbus_console_log_level = modbus_console_log_level
-        self.modbus_file_log_level = modbus_file_log_level
-        self.modbus_log = modbus_log
-
-    def to_dict(self):
-        return vars(self)
-
-
-def configure_modbus_logger(cfg, protocol_logger ="modbus_tk",
-                            recycle_logs=True):
-    """
-    Configure the logger.
-
-    Args:
-        cfg (Namespace): The PUReST config namespace.
-    """
-
-    logger = logging.getLogger(protocol_logger)
-    if isinstance(cfg, dict):
-        cfg = Configuration(**cfg)
-
-    if cfg.no_modbus_log:
-        logger.setLevel(logging.ERROR)
-        logger.addHandler(logging.NullHandler())
-    else:
-        logger.setLevel(logging.DEBUG)
-        fmt = (
-            "%(asctime)s - %(levelname)s - "
-            "%(module)s::%(funcName)s @ %(lineno)d - %(message)s"
-        )
-        fmtr = logging.Formatter(fmt)
-
-        if not cfg.no_modbus_console_log:
-            sh = logging.StreamHandler()
-            sh.setFormatter(fmtr)
-            sh.setLevel(cfg.modbus_console_log_level.upper())
-            logger.addHandler(sh)
-
-        if not cfg.no_modbus_file_log:
-            modbus_log = path(cfg.modbus_log)
-            if recycle_logs:
-                remove_file(modbus_log)
-            make_dir(os.path.dirname(modbus_log))
-            fh = logging.FileHandler(modbus_log)
-            fh.setFormatter(fmtr)
-            fh.setLevel(cfg.modbus_file_log_level.upper())
-            logger.addHandler(fh)
-

@@ -66,6 +66,9 @@ target/
 
 #JSONFiles
 *.json
+
+/.venv
+
 **/*.ini
 instructions
 read
