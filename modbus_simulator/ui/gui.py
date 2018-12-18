@@ -544,8 +544,8 @@ class Gui(BoxLayout):
         registers = sum(
             map(
                 lambda val: int(
-                    filter(
-                        str.isdigit, str(val.get('formatter', '16')))
+                    ''.join(list(filter(
+                        str.isdigit, str(val.get('formatter', '16')))))
                 ), _data['data'].values()))/16
 
         # Old schema
@@ -604,11 +604,17 @@ class Gui(BoxLayout):
         try:
             _data = self.data_map[self.active_slave][current_tab]
             _updated = {}
-            for k, v in data.items():
-                old_wc = int(filter(str.isdigit, str(old_formatter)))/16
-                new_wc = int(filter(str.isdigit, v.get('formatter')))/16
+            current = list(data.keys())
+            for k in current:
+                old_wc = int(''.join(list(
+                    filter(str.isdigit, str(old_formatter))
+                )))/16
+                new_wc = int(''.join(list(
+                    filter(str.isdigit, data[k].get('formatter'))
+                )))/16
                 new_val, count = self.modbus_device.decode(
-                    int(self.active_slave), current_tab, k, v['formatter']
+                    int(self.active_slave),
+                    current_tab, k, data[k]['formatter']
                 )
                 data[k]['value'] = new_val
                 _updated['offset'] = k
@@ -621,6 +627,7 @@ class Gui(BoxLayout):
                     )
                     for i, val in enumerate(missing):
                         o = int(k) + new_wc + i
+                        o = int(o)
                         if not isinstance(k, int):
                             o = str(o)
                         data[o] = {'value': val, 'formatter': 'uint16'}

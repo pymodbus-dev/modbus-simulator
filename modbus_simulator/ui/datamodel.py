@@ -60,7 +60,8 @@ class ErrorPopup(Popup):
     """
     def __init__(self, **kwargs):
         # print kwargs
-        super(ErrorPopup, self).__init__(**kwargs)
+        super(ErrorPopup, self).__init__()
+        # super(ErrorPopup, self).__init__(**kwargs)
         content = BoxLayout(orientation="vertical")
         content.add_widget(Label(text=kwargs['text'], font_size=20))
         mybutton = Button(text="Dismiss", size_hint=(1,.20), font_size=20)
@@ -462,7 +463,7 @@ class DataModel(GridLayout):
         to_remove = None
         if count > 1:
             offset = int(offset)
-            to_remove = [str(o) for o in list(xrange(offset+1, offset+count))]
+            to_remove = [str(o) for o in list(range(offset+1, offset+count))]
 
         self.list_view.adapter.update_for_new_data()
         self.refresh(new_values, to_remove)
