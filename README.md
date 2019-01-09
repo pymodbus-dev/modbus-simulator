@@ -12,7 +12,7 @@ Modbus Simulator with GUI based on modbus-tk and Pymodbus
    
     ```
     $ # Kivy depends on Cython, Install Cython before running the requirements
-    $ pip install Cython==0.25.2
+    $ pip install Cython==0.29.2
     $ pip install -r requirements
     $ # Choose Modbus Backend modbus_tk or pymodbus (default)
     $ # To install pymodbus
