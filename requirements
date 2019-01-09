@@ -6,6 +6,7 @@ Kivy-Garden==0.1.4
 pygame==1.9.4
 pyglet==1.2.4
 Pygments==2.1.3
+pymodbus==2.1.0
 pyserial==3.2.1
 requests==2.12.4
 six==1.10.0
