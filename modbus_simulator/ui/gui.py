@@ -588,9 +588,12 @@ class Gui(BoxLayout):
                         v['formatter']
                     )
                 else:
+                    # v = dict(value=int(v))
+                    if not isinstance(v, dict):
+                        v = dict(value=v)
                     self.modbus_device.set_values(int(self.active_slave),
                                                   current_tab,
-                                                  k, int(v['value']))
+                                                  k, v.get('value'))
         except KeyError:
             pass
         except struct.error:

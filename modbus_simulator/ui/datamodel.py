@@ -423,7 +423,7 @@ class DataModel(GridLayout):
         if self.blockname in ['input_registers', 'holding_registers']:
             self.list_view.adapter.data[index]['value'] = float(data)
         else:
-            self.list_view.adapter.data.update({index: float(data)})
+            self.list_view.adapter.data[index]['value'] = int(data)
         self.list_view._trigger_reset_populate()
         data = {'event': 'sync_data',
                 'data': {index: self.list_view.adapter.data[index]}}
