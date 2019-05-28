@@ -243,7 +243,7 @@ class ModbusSimu(object):
         slave = self.get_slave(slave_id)
         address = self._calc_offset(block_name, address)
         if slave.validate(_FX_MAPPER[block_name], address, count=size):
-            return slave.getValues(_FX_MAPPER[block_name], address, size)
+            return slave.getValues(_FX_MAPPER[block_name], address, int(size))
 
     def get_slave(self, slave_id):
         return self.context[slave_id]
@@ -265,6 +265,8 @@ class ModbusSimu(object):
         builder = BinaryPayloadBuilder(byteorder=self.byte_order,
                                        wordorder=self.word_order)
         add_method = ENCODERS.get(formatter)
+        if 'int' in add_method:  # Temp fix
+            value = int(value)
         getattr(builder, add_method)(value)
         payload = builder.to_registers()
         return self.set_values(slave_id, block_name, offset, payload)
