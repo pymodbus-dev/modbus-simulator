@@ -13,7 +13,7 @@ from kivy.uix.textinput import TextInput
 from kivy.uix.settings import SettingsWithSidebar
 from kivy.uix.listview import ListView, ListItemButton
 from kivy.adapters.listadapter import ListAdapter
-from modbus_simulator.utils.constants import BLOCK_TYPES
+from modbus_simulator.utils.constants import BLOCK_TYPES, ADDRESS_RANGE
 from modbus_simulator.utils.common import configure_modbus_logger
 from modbus_simulator.ui.settings import SettingIntegerWithRange
 from modbus_simulator.utils.backgroundJob import BackgroundJob
@@ -688,7 +688,7 @@ class Gui(BoxLayout):
     def update_backend(self, slave_id, blockname, new_data):
         self.modbus_device.remove_block(slave_id, blockname)
         self.modbus_device.add_block(slave_id, blockname,
-                                     BLOCK_TYPES[blockname], 0,
+                                     BLOCK_TYPES[blockname], ADDRESS_RANGE[BLOCK_TYPES[blockname]],
                                      self.block_size)
         for k, v in new_data.items():
             if blockname in ['holding_registers', 'input_registers']:

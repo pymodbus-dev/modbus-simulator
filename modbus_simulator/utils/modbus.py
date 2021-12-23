@@ -9,8 +9,11 @@ from modbus_tk.defines import (
     COILS, DISCRETE_INPUTS, HOLDING_REGISTERS, ANALOG_INPUTS)
 from modbus_tk.modbus_rtu import RtuServer, RtuMaster
 from modbus_tk.modbus_tcp import TcpServer, TcpMaster
+from pymodbus.constants import Endian
+from pymodbus.payload import BinaryPayloadDecoder, BinaryPayloadBuilder
 
 from modbus_simulator.utils.common import path, make_dir, remove_file
+from modbus_simulator.utils.pymodbus_server import DECODERS, ENCODERS
 
 ADDRESS_RANGE = {
     COILS: 0,
@@ -90,7 +93,10 @@ class ModbusSimu(object):
             kwargs['serial'] = self._serial.ser
         else:
             kwargs['port'] = int(kwargs['port'])
-        self.server = SERVERS.get(server, None)(*args, **kwargs)
+        if server == "tcp":
+            self.server = TcpServer(*args, port=kwargs['port'],address=kwargs['address'])
+        else:
+            self.server = SERVERS.get(server, None)(*args, **kwargs)
         self.simulate = kwargs.get('simulate', False)
 
     @property
@@ -124,11 +130,11 @@ class ModbusSimu(object):
 
     def set_values(self, slave_id, block_name, address, values):
         slave = self.server.get_slave(slave_id)
-        slave.set_values(block_name, address, values)
+        slave.set_values(block_name, int(address), values)
 
     def get_values(self, slave_id, block_name, address, size=1):
         slave = self.server.get_slave(slave_id)
-        return slave.get_values(block_name, address, size)
+        return slave.get_values(block_name, int(address), size)
 
     def start(self):
         self.server.start()
@@ -144,6 +150,31 @@ class ModbusSimu(object):
     def get_slaves(self):
         if self.server is not None:
             return self.server._databank._slaves
+
+    def decode(self, slave_id, block_name, offset, formatter):
+        count = 1
+        offset = int(offset)
+        if '32' in formatter:
+            count = 2
+        elif '64' in formatter:
+            count = 4
+        values = self.get_values(slave_id, block_name, offset, count)
+        values = list(values)
+        if values:
+            decoder = BinaryPayloadDecoder.fromRegisters(
+                values, byteorder=Endian.Big, wordorder=Endian.Big)
+            values = getattr(decoder, DECODERS.get(formatter))()
+            return values, count
+
+    def encode(self, slave_id, block_name, offset, value, formatter):
+        builder = BinaryPayloadBuilder(byteorder=Endian.Big,
+                                       wordorder=Endian.Big)
+        add_method = ENCODERS.get(formatter)
+        if 'int' in add_method:  # Temp fix
+            value = int(value)
+        getattr(builder, add_method)(value)
+        payload = builder.to_registers()
+        return self.set_values(slave_id, block_name, int(offset), payload)
 
 
 def swap_bytes(byte_array):

@@ -15,7 +15,7 @@ else:
 @click.command()
 @click.option("-p", is_flag=True, help="use pymodbus as modbus backend")
 def _run(p):
-    __builtin__.USE_PYMODBUS = p
+    __builtin__.USE_PYMODBUS = False
     if "-p" in sys.argv:
         # cleanup before kivy gets confused
         sys.argv.remove("-p")
